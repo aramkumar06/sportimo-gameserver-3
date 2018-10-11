@@ -1,0 +1,6 @@
+// Authentication
+
+https://api.statscore.com/v2/oauth.xml?client_id=132&secret_key=3iqAJvFlU0Y4bjB7MNkA4tu8tDMNI4QVYkh
+
+https://api.statscore.com/v2/feed/2332286?token=d97763d4655386b5fe0760bcfe209dbb&limit=500&page=1
+

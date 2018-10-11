@@ -1,0 +1,405 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{025a1eed-ee5f-43eb-8a7b-92129db09141}</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <ProjectView>ShowAllFiles</ProjectView>
+    <StartupFile>server.js</StartupFile>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{3AF33F2E-1136-4D97-BBB7-1795711AC8B8};{349c5851-65df-11da-9384-00065b846f21};{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}</ProjectTypeGuids>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">14.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <LastActiveSolutionConfig>Debug|Any CPU</LastActiveSolutionConfig>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <ItemGroup>
+    <Content Include="jsconfig.json" />
+    <Content Include="package-lock.json" />
+    <Content Include="package.json" />
+    <Content Include="README.md" />
+    <Content Include="gulpfile.js" />
+    <Content Include="Procfile.js" />
+    <Content Include="server.js" />
+    <Content Include="amqp.node\package.json" />
+    <Content Include="amqp.node\CHANGELOG.md" />
+    <Content Include="amqp.node\README.md" />
+    <Content Include="amqp.node\callback_api.js" />
+    <Content Include="amqp.node\channel_api.js" />
+    <Content Include="config\mongoConfig.js" />
+    <Content Include="config\redisConfig.js" />
+    <Content Include="diagrams\IMG_4690.PNG" />
+    <Content Include="documentation\Cleaning selected users and matches from MongoDB with Robomongo.txt" />
+    <Content Include="documentation\Mongo Footprint for 1 match.txt" />
+    <Content Include="documentation\Requested Mongo Scripts SPI-596.txt" />
+    <Content Include="documentation\SPI-733 query.txt" />
+    <Content Include="documentation\SPI-733b query.txt" />
+    <Content Include="documentation\SPI-734 query.txt" />
+    <Content Include="documentation\SPI-735 query.txt" />
+    <Content Include="documentation\Sportimo unique users with card query report.txt" />
+    <Content Include="documentation\Sportimo users card playing progression query report.txt" />
+    <Content Include="documentation\Sportimo users card playing progression query with achievement info report.txt" />
+    <Content Include="documentation\Statscore API samples.txt" />
+    <Content Include="documentation\Statscore incident types.txt" />
+    <Content Include="documentation\Statscore parserids mapping.txt" />
+    <Content Include="documentation\Useful MongoDB scripts.txt" />
+    <Content Include="documentation\WC2018 player name migration to arabic from Excel.txt" />
+    <Content Include="documentation\Statscore autobooked championships.PNG" />
+    <Content Include="documentation\GoogleService-ServiceAccount-Sportimo-afb0e46490b0.json" />
+    <Content Include="documentation\Sportimo API.postman_collection.json" />
+    <Content Include="documentation\Statscore Egyptian League teams list.json" />
+    <Content Include="documentation\Statscore Saudi Prof League teams list.json" />
+    <Content Include="documentation\Statscore UAE League teams list.json" />
+    <Content Include="documentation\statscore_competitions.json" />
+    <Content Include="models\settings.js" />
+    <Content Include="socksjs\socksjs.js" />
+    <Content Include="static\corner_ar.html" />
+    <Content Include="static\corner_en.html" />
+    <Content Include="static\defence_ar.html" />
+    <Content Include="static\defence_en.html" />
+    <Content Include="static\foul_ar.html" />
+    <Content Include="static\foul_en.html" />
+    <Content Include="static\goal_ar.html" />
+    <Content Include="static\goal_en.html" />
+    <Content Include="static\offside_ar.html" />
+    <Content Include="static\offside_en.html" />
+    <Content Include="static\penalty_ar.html" />
+    <Content Include="static\penalty_en.html" />
+    <Content Include="static\red_ar.html" />
+    <Content Include="static\red_en.html" />
+    <Content Include="static\result_ar.html" />
+    <Content Include="static\result_en.html" />
+    <Content Include="static\shot_on_goal.html" />
+    <Content Include="static\shot_on_goal_ar.html" />
+    <Content Include="static\yellow_ar.html" />
+    <Content Include="static\yellow_en.html" />
+    <Content Include="static\corner_en.png" />
+    <Content Include="static\defence_en.png" />
+    <Content Include="static\foul_en.png" />
+    <Content Include="static\goal_en.png" />
+    <Content Include="static\offside_en.png" />
+    <Content Include="static\penalty_en.png" />
+    <Content Include="static\red_en.png" />
+    <Content Include="static\result_en.png" />
+    <Content Include="static\shot_on_goal.png" />
+    <Content Include="static\yellow_en.png" />
+    <Content Include="amqp.node\bin\amqp-rabbitmq-0.9.1.json" />
+    <Content Include="amqp.node\bin\generate-defs.js" />
+    <Content Include="amqp.node\examples\headers.js" />
+    <Content Include="amqp.node\examples\receive_generator.js" />
+    <Content Include="amqp.node\examples\send_generators.js" />
+    <Content Include="amqp.node\examples\ssl.js" />
+    <Content Include="amqp.node\examples\waitForConfirms.js" />
+    <Content Include="amqp.node\lib\api_args.js" />
+    <Content Include="amqp.node\lib\bitset.js" />
+    <Content Include="amqp.node\lib\callback_model.js" />
+    <Content Include="amqp.node\lib\channel.js" />
+    <Content Include="amqp.node\lib\channel_model.js" />
+    <Content Include="amqp.node\lib\codec.js" />
+    <Content Include="amqp.node\lib\connect.js" />
+    <Content Include="amqp.node\lib\connection.js" />
+    <Content Include="amqp.node\lib\credentials.js" />
+    <Content Include="amqp.node\lib\defs.js" />
+    <Content Include="amqp.node\lib\error.js" />
+    <Content Include="amqp.node\lib\format.js" />
+    <Content Include="amqp.node\lib\frame.js" />
+    <Content Include="amqp.node\lib\heartbeat.js" />
+    <Content Include="amqp.node\lib\mux.js" />
+    <Content Include="amqp.node\test\bitset.js" />
+    <Content Include="amqp.node\test\callback_api.js" />
+    <Content Include="amqp.node\test\channel.js" />
+    <Content Include="amqp.node\test\channel_api.js" />
+    <Content Include="amqp.node\test\codec.js" />
+    <Content Include="amqp.node\test\connect.js" />
+    <Content Include="amqp.node\test\connection.js" />
+    <Content Include="amqp.node\test\data.js" />
+    <Content Include="amqp.node\test\frame.js" />
+    <Content Include="amqp.node\test\mux.js" />
+    <Content Include="amqp.node\test\util.js" />
+    <Content Include="amqp.node\examples\tutorials\package.json" />
+    <Content Include="amqp.node\examples\tutorials\README.md" />
+    <Content Include="amqp.node\examples\tutorials\emit_log.js" />
+    <Content Include="amqp.node\examples\tutorials\emit_log_direct.js" />
+    <Content Include="amqp.node\examples\tutorials\emit_log_topic.js" />
+    <Content Include="amqp.node\examples\tutorials\new_task.js" />
+    <Content Include="amqp.node\examples\tutorials\receive.js" />
+    <Content Include="amqp.node\examples\tutorials\receive_logs.js" />
+    <Content Include="amqp.node\examples\tutorials\receive_logs_direct.js" />
+    <Content Include="amqp.node\examples\tutorials\receive_logs_topic.js" />
+    <Content Include="amqp.node\examples\tutorials\rpc_client.js" />
+    <Content Include="amqp.node\examples\tutorials\rpc_server.js" />
+    <Content Include="amqp.node\examples\tutorials\send.js" />
+    <Content Include="amqp.node\examples\tutorials\worker.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\emit_log.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\emit_log_direct.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\emit_log_topic.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\new_task.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\receive.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\receive_logs.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\receive_logs_direct.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\receive_logs_topic.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\rpc_client.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\rpc_server.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\send.js" />
+    <Content Include="amqp.node\examples\tutorials\callback_api\worker.js" />
+    <Content Include="sportimo_modules\bedbugAchievements\index.js" />
+    <Content Include="sportimo_modules\data-module\index.js" />
+    <Content Include="sportimo_modules\early-access\index.js" />
+    <Content Include="sportimo_modules\gamecards\index.js" />
+    <Content Include="sportimo_modules\leaderpay\bower.json" />
+    <Content Include="sportimo_modules\leaderpay\package.json" />
+    <Content Include="sportimo_modules\leaderpay\README.md" />
+    <Content Include="sportimo_modules\leaderpay\Gruntfile.js" />
+    <Content Include="sportimo_modules\leaderpay\index.js" />
+    <Content Include="sportimo_modules\match-moderation\index.js" />
+    <Content Include="sportimo_modules\messaging-tools\index.js" />
+    <Content Include="sportimo_modules\models\achievement.js" />
+    <Content Include="sportimo_modules\models\answer.js" />
+    <Content Include="sportimo_modules\models\article.js" />
+    <Content Include="sportimo_modules\models\competition.js" />
+    <Content Include="sportimo_modules\models\favQuestion.js" />
+    <Content Include="sportimo_modules\models\gamecardDefinition.js" />
+    <Content Include="sportimo_modules\models\gamecardTemplate.js" />
+    <Content Include="sportimo_modules\models\gameServerSettings.js" />
+    <Content Include="sportimo_modules\models\introQuestions.js" />
+    <Content Include="sportimo_modules\models\knockoutStanding.js" />
+    <Content Include="sportimo_modules\models\matchEvents.js" />
+    <Content Include="sportimo_modules\models\matchfeedStatus.js" />
+    <Content Include="sportimo_modules\models\matchRawEventsStream.js" />
+    <Content Include="sportimo_modules\models\message.js" />
+    <Content Include="sportimo_modules\models\player.js" />
+    <Content Include="sportimo_modules\models\poll.js" />
+    <Content Include="sportimo_modules\models\purchase.js" />
+    <Content Include="sportimo_modules\models\question.js" />
+    <Content Include="sportimo_modules\models\scheduled-matches.js" />
+    <Content Include="sportimo_modules\models\score.js" />
+    <Content Include="sportimo_modules\models\sponsor.js" />
+    <Content Include="sportimo_modules\models\standing.js" />
+    <Content Include="sportimo_modules\models\star.js" />
+    <Content Include="sportimo_modules\models\stats-mod.js" />
+    <Content Include="sportimo_modules\models\stats_responses.js" />
+    <Content Include="sportimo_modules\models\subscription.js" />
+    <Content Include="sportimo_modules\models\taunt.js" />
+    <Content Include="sportimo_modules\models\team.js" />
+    <Content Include="sportimo_modules\models\user.js" />
+    <Content Include="sportimo_modules\models\userActivity.js" />
+    <Content Include="sportimo_modules\models\userGamecard.js" />
+    <Content Include="sportimo_modules\models\userLinkcode.js" />
+    <Content Include="sportimo_modules\models\userTaunt.js" />
+    <Content Include="sportimo_modules\notifications\notifications.js" />
+    <Content Include="sportimo_modules\offline_data\offline_data_updater.js" />
+    <Content Include="sportimo_modules\polls\index.js" />
+    <Content Include="sportimo_modules\questions\index.js" />
+    <Content Include="sportimo_modules\users\package.json" />
+    <Content Include="sportimo_modules\users\config.js" />
+    <Content Include="sportimo_modules\users\index.js" />
+    <Content Include="sportimo_modules\data-module\api\achievement.js" />
+    <Content Include="sportimo_modules\data-module\api\article.js" />
+    <Content Include="sportimo_modules\data-module\api\competition.js" />
+    <Content Include="sportimo_modules\data-module\api\introQuestions.js" />
+    <Content Include="sportimo_modules\data-module\api\match.js" />
+    <Content Include="sportimo_modules\data-module\api\messages.js" />
+    <Content Include="sportimo_modules\data-module\api\player.js" />
+    <Content Include="sportimo_modules\data-module\api\poll.js" />
+    <Content Include="sportimo_modules\data-module\api\purchase.js" />
+    <Content Include="sportimo_modules\data-module\api\schedule.js" />
+    <Content Include="sportimo_modules\data-module\api\sponsor.js" />
+    <Content Include="sportimo_modules\data-module\api\standing.js" />
+    <Content Include="sportimo_modules\data-module\api\stars.js" />
+    <Content Include="sportimo_modules\data-module\api\tags.js" />
+    <Content Include="sportimo_modules\data-module\api\team.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\achievement.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\competition.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\introQuestions.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\messages.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\player.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\purchase.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\sponsor.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\stars.js" />
+    <Content Include="sportimo_modules\data-module\apiObjects\team.js" />
+    <Content Include="sportimo_modules\data-module\config\googleapiskey.json" />
+    <Content Include="sportimo_modules\data-module\config\db.js" />
+    <Content Include="sportimo_modules\data-module\config\empty-match.js" />
+    <Content Include="sportimo_modules\data-module\config\lib.js" />
+    <Content Include="sportimo_modules\data-module\routes\index.js" />
+    <Content Include="sportimo_modules\data-module\test\test-achievement.js" />
+    <Content Include="sportimo_modules\data-module\test\test-competition.js" />
+    <Content Include="sportimo_modules\data-module\test\test-player.js" />
+    <Content Include="sportimo_modules\data-module\test\test-sponsor.js" />
+    <Content Include="sportimo_modules\data-module\test\test-team.js" />
+    <Content Include="sportimo_modules\data-module\views\article.ejs" />
+    <Content Include="sportimo_modules\data-module\public\css\publication.css" />
+    <Content Include="sportimo_modules\data-module\public\css\style.css" />
+    <Content Include="sportimo_modules\data-module\public\css\zoom.css" />
+    <Content Include="sportimo_modules\data-module\public\js\app.js" />
+    <Content Include="sportimo_modules\data-module\public\js\iscroll-probe.js" />
+    <Content Include="sportimo_modules\data-module\public\js\iscroll.js" />
+    <Content Include="sportimo_modules\data-module\public\js\script.js" />
+    <Content Include="sportimo_modules\early-access\api\earlyaccessuser.js" />
+    <Content Include="sportimo_modules\early-access\models\earlyAccessUser.js" />
+    <Content Include="sportimo_modules\gamecards\api\gamecards.js" />
+    <Content Include="sportimo_modules\leaderpay\api\leaderboard.js" />
+    <Content Include="sportimo_modules\leaderpay\api\pool.js" />
+    <Content Include="sportimo_modules\leaderpay\api\prize.js" />
+    <Content Include="sportimo_modules\leaderpay\api\score.js" />
+    <Content Include="sportimo_modules\leaderpay\apiObjects\leaderboard.js" />
+    <Content Include="sportimo_modules\leaderpay\apiObjects\pool.js" />
+    <Content Include="sportimo_modules\leaderpay\apiObjects\prize.js" />
+    <Content Include="sportimo_modules\leaderpay\apiObjects\score.js" />
+    <Content Include="sportimo_modules\leaderpay\config\db.js" />
+    <Content Include="sportimo_modules\leaderpay\config\lib.js" />
+    <Content Include="sportimo_modules\leaderpay\models\leaderoom.js" />
+    <Content Include="sportimo_modules\leaderpay\models\pool.js" />
+    <Content Include="sportimo_modules\leaderpay\models\prize.js" />
+    <Content Include="sportimo_modules\leaderpay\routes\index.js" />
+    <Content Include="sportimo_modules\leaderpay\test\test-prize.js" />
+    <Content Include="sportimo_modules\leaderpay\test\test-score.js" />
+    <Content Include="sportimo_modules\match-moderation\api\manual.js" />
+    <Content Include="sportimo_modules\match-moderation\api\schedule.js" />
+    <Content Include="sportimo_modules\match-moderation\api\services-handling.js" />
+    <Content Include="sportimo_modules\match-moderation\config\db.js" />
+    <Content Include="sportimo_modules\match-moderation\lib\match-module.js" />
+    <Content Include="sportimo_modules\match-moderation\lib\sports-settings.js" />
+    <Content Include="sportimo_modules\match-moderation\lib\StatsHelper.js" />
+    <Content Include="sportimo_modules\match-moderation\mocks\empty-match.js" />
+    <Content Include="sportimo_modules\match-moderation\mocks\mock-match.js" />
+    <Content Include="sportimo_modules\match-moderation\parsers\Stats.js" />
+    <Content Include="sportimo_modules\match-moderation\parsers\Statscore.js" />
+    <Content Include="sportimo_modules\match-moderation\services\manual.js" />
+    <Content Include="sportimo_modules\match-moderation\services\rss-feed.js" />
+    <Content Include="sportimo_modules\messaging-tools\config\pre-messages.js" />
+    <Content Include="sportimo_modules\offline_data\api\ondemand.js" />
+    <Content Include="sportimo_modules\offline_data\api\onschedule.js" />
+    <Content Include="sportimo_modules\offline_data\config\db.js" />
+    <Content Include="sportimo_modules\offline_data\parsers\Stats.js" />
+    <Content Include="sportimo_modules\offline_data\parsers\Statscore.js" />
+    <Content Include="sportimo_modules\polls\api\poll.js" />
+    <Content Include="sportimo_modules\polls\config\db.js" />
+    <Content Include="sportimo_modules\polls\test\test-question.js" />
+    <Content Include="sportimo_modules\questions\api\favQuestion.js" />
+    <Content Include="sportimo_modules\questions\api\question.js" />
+    <Content Include="sportimo_modules\questions\apiObjects\favQuestion.js" />
+    <Content Include="sportimo_modules\questions\apiObjects\question.js" />
+    <Content Include="sportimo_modules\questions\config\db.js" />
+    <Content Include="sportimo_modules\questions\config\lib.js" />
+    <Content Include="sportimo_modules\questions\routes\index.js" />
+    <Content Include="sportimo_modules\questions\test\test-question.js" />
+    <Content Include="static\helpcenter\index.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="amqp.node" />
+    <Folder Include="amqp.node\bin" />
+    <Folder Include="amqp.node\examples" />
+    <Folder Include="amqp.node\examples\tutorials" />
+    <Folder Include="amqp.node\examples\tutorials\callback_api" />
+    <Folder Include="amqp.node\lib" />
+    <Folder Include="amqp.node\test" />
+    <Folder Include="config" />
+    <Folder Include="diagrams" />
+    <Folder Include="documentation" />
+    <Folder Include="models" />
+    <Folder Include="qtunnel" />
+    <Folder Include="qtunnel\bin" />
+    <Folder Include="qtunnel\vendor" />
+    <Folder Include="qtunnel\vendor\nss_wrapper" />
+    <Folder Include="socksjs" />
+    <Folder Include="sportimo_modules" />
+    <Folder Include="sportimo_modules\bedbugAchievements" />
+    <Folder Include="sportimo_modules\data-module" />
+    <Folder Include="sportimo_modules\data-module\api" />
+    <Folder Include="sportimo_modules\data-module\apiObjects" />
+    <Folder Include="sportimo_modules\data-module\config" />
+    <Folder Include="sportimo_modules\data-module\public" />
+    <Folder Include="sportimo_modules\data-module\public\css" />
+    <Folder Include="sportimo_modules\data-module\public\js" />
+    <Folder Include="sportimo_modules\data-module\routes" />
+    <Folder Include="sportimo_modules\data-module\test" />
+    <Folder Include="sportimo_modules\data-module\views" />
+    <Folder Include="sportimo_modules\early-access" />
+    <Folder Include="sportimo_modules\early-access\api" />
+    <Folder Include="sportimo_modules\early-access\models" />
+    <Folder Include="sportimo_modules\gamecards" />
+    <Folder Include="sportimo_modules\gamecards\api" />
+    <Folder Include="sportimo_modules\leaderpay" />
+    <Folder Include="sportimo_modules\leaderpay\api" />
+    <Folder Include="sportimo_modules\leaderpay\apiObjects" />
+    <Folder Include="sportimo_modules\leaderpay\config" />
+    <Folder Include="sportimo_modules\leaderpay\models" />
+    <Folder Include="sportimo_modules\leaderpay\routes" />
+    <Folder Include="sportimo_modules\leaderpay\test" />
+    <Folder Include="sportimo_modules\match-moderation" />
+    <Folder Include="sportimo_modules\match-moderation\api" />
+    <Folder Include="sportimo_modules\match-moderation\config" />
+    <Folder Include="sportimo_modules\match-moderation\lib" />
+    <Folder Include="sportimo_modules\match-moderation\mocks" />
+    <Folder Include="sportimo_modules\match-moderation\parsers" />
+    <Folder Include="sportimo_modules\match-moderation\services" />
+    <Folder Include="sportimo_modules\messaging-tools" />
+    <Folder Include="sportimo_modules\messaging-tools\config" />
+    <Folder Include="sportimo_modules\models" />
+    <Folder Include="sportimo_modules\notifications" />
+    <Folder Include="sportimo_modules\offline_data" />
+    <Folder Include="sportimo_modules\offline_data\api" />
+    <Folder Include="sportimo_modules\offline_data\config" />
+    <Folder Include="sportimo_modules\offline_data\parsers" />
+    <Folder Include="sportimo_modules\polls" />
+    <Folder Include="sportimo_modules\polls\api" />
+    <Folder Include="sportimo_modules\polls\config" />
+    <Folder Include="sportimo_modules\polls\test" />
+    <Folder Include="sportimo_modules\questions" />
+    <Folder Include="sportimo_modules\questions\api" />
+    <Folder Include="sportimo_modules\questions\apiObjects" />
+    <Folder Include="sportimo_modules\questions\config" />
+    <Folder Include="sportimo_modules\questions\routes" />
+    <Folder Include="sportimo_modules\questions\test" />
+    <Folder Include="sportimo_modules\users" />
+    <Folder Include="SportimoGameserver3" />
+    <Folder Include="static" />
+    <Folder Include="static\helpcenter" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <!--Do not delete the following Import Project.  While this appears to do nothing it is a marker for setting TypeScript properties before our import that depends on them.-->
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\TypeScript\Microsoft.TypeScript.targets" Condition="False" />
+  <Import Project="$(VSToolsPath)\Node.js Tools\Microsoft.NodejsTools.targets" />
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <UseIIS>False</UseIIS>
+          <AutoAssignPort>True</AutoAssignPort>
+          <DevelopmentServerPort>0</DevelopmentServerPort>
+          <DevelopmentServerVPath>/</DevelopmentServerVPath>
+          <IISUrl>http://localhost:48022/</IISUrl>
+          <NTLMAuthentication>False</NTLMAuthentication>
+          <UseCustomServer>True</UseCustomServer>
+          <CustomServerUrl>http://localhost:1337</CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}" User="">
+        <WebProjectProperties>
+          <StartPageUrl>
+          </StartPageUrl>
+          <StartAction>CurrentPage</StartAction>
+          <AspNetDebugging>True</AspNetDebugging>
+          <SilverlightDebugging>False</SilverlightDebugging>
+          <NativeDebugging>False</NativeDebugging>
+          <SQLDebugging>False</SQLDebugging>
+          <ExternalProgram>
+          </ExternalProgram>
+          <StartExternalURL>
+          </StartExternalURL>
+          <StartCmdLineArguments>
+          </StartCmdLineArguments>
+          <StartWorkingDirectory>
+          </StartWorkingDirectory>
+          <EnableENC>False</EnableENC>
+          <AlwaysStartWebServerOnDebug>False</AlwaysStartWebServerOnDebug>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+</Project>

@@ -1,0 +1,6 @@
+
+[qgtunnel.0]
+accept = "127.0.0.1:5672"
+connect = "queue.statscore.com:5672"
+encrypted = false
+transparent = true
