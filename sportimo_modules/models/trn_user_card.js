@@ -4,11 +4,11 @@
 
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema,
-    ObjectId = Schema.ObjectId,
+    ObjectId = Schema.Types.ObjectId,
     moment = require('moment');
 
-if (mongoose.models.userGamecards)
-    module.exports = mongoose.models.userGamecards;
+if (mongoose.models.trn_user_cards)
+    module.exports = mongoose.models.trn_user_cards;
 else {
     
     var special = new mongoose.Schema({
@@ -35,15 +35,20 @@ else {
     });
     
     var userGamecard = new mongoose.Schema({
+        // New fields
+        client: { type: ObjectId, ref: 'trn_clients' },
+        tournament: { type: ObjectId, ref: 'tournaments', required: true },
+        //tournamentMatch: { type: ObjectId, ref: 'trn_matches', required: true },
+
+        matchid: String,    // this is a id ref to tournament_matches
         userid: String,
         gamecardDefinitionId: {
             type: String,
-            ref: 'gamecardDefinitions'
+            ref: 'trn_card_definitions'
         },
         optionId: String, // valid only if the definition includdes options.
         pointsAwarded: Number,
         pointsAwardedInitially: Number,
-        matchid: String,
         title: Schema.Types.Mixed, // card title
         image: Schema.Types.Mixed, // icon image
         text: Schema.Types.Mixed,
@@ -94,5 +99,5 @@ else {
         next();
     });
     
-    module.exports = mongoose.model("userGamecards", userGamecard);
+    module.exports = mongoose.model("trn_user_cards", userGamecard);
 }

@@ -4,8 +4,8 @@ const mongoose = require('mongoose'),
     Schema = mongoose.Schema,
     ObjectId = Schema.ObjectId;
 
-if (mongoose.models.stars)
-    module.exports = mongoose.models.stars;
+if (mongoose.models.trn_stars)
+    module.exports = mongoose.models.trn_stars;
 else {
 
     const titleSchema = new mongoose.Schema({
@@ -22,8 +22,12 @@ else {
     });
 
     const starSchema = new Schema({
+        // New fields
+        client: { type: String, ref: 'clients' },
+        tournament: { type: String, ref: 'tournaments' },
+
         users: [userSchema]
     });
 
-    module.exports = mongoose.model('stars', starSchema);
+    module.exports = mongoose.model('trn_stars', starSchema);
 }

@@ -10,10 +10,10 @@
 
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema,
-    ObjectId = Schema.ObjectId;
+    ObjectId = Schema.Types.ObjectId;
 
-if (mongoose.models.gamecardTemplates)
-    module.exports = mongoose.models.gamecardTemplates;
+if (mongoose.models.trn_card_templates)
+    module.exports = mongoose.models.trn_card_templates;
 else {
     var specialActivationLatencyType = new mongoose.Schema({
         DoublePoints: Number, 
@@ -36,6 +36,10 @@ else {
 
 
     var gamecardTemplate = new mongoose.Schema({
+        // New fields
+        client: { type: ObjectId, ref: 'trn_clients' },
+        tournament: { type: ObjectId, ref: 'tournaments' },
+
         isActive: Boolean,
         title: Schema.Types.Mixed, // card title
         image: Schema.Types.Mixed, // icon image
@@ -55,8 +59,8 @@ else {
         pointsPerMinute: Number,
         startPoints: Number,
         endPoints: Number,
-        cardType: { type: String, enum: ['Instant', 'Overall', 'PresetInstant'] },
+        cardType: { type: String, enum: ['Instant', 'Overall', 'PresetInstant'] }
     });
 
-    module.exports = mongoose.model("gamecardTemplates", gamecardTemplate);
+    module.exports = mongoose.model("trn_card_templates", gamecardTemplate);
 }

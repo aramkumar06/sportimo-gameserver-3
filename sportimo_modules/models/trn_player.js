@@ -1,31 +1,28 @@
-'use strict';
+﻿'use strict';
 
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema;
 
 
-if (mongoose.models.players)
-    module.exports = mongoose.models.players;
+if (mongoose.models.trn_players)
+    module.exports = mongoose.models.trn_players;
 else {
     var player = {
         name: { type: Schema.Types.Mixed },
         firstName: { type: Schema.Types.Mixed },
         lastName: { type: Schema.Types.Mixed },
-        uniformNumber : { type: String },
-        stats: { type: Schema.Types.Mixed },
         pic: { type: String },
         position: { type: String },
         personalData: { type: Schema.Types.Mixed },
-        parserids: {  type: Schema.Types.Mixed },
-        teamId: {
-            type: String,
-            ref: 'teams'
-        },
+        parserids: { type: Schema.Types.Mixed },
         created: { type: Date, default: Date.now },
-        updated: { type: Date }
+        updated: { type: Date },
+
+        // New fields in v3
+        shortName: { type: Schema.Types.Mixed },
     };
-    
+
     var playerSchema = new Schema(player);
-    
-    module.exports = mongoose.model('players', playerSchema);
+
+    module.exports = mongoose.model('trn_players', playerSchema);
 }

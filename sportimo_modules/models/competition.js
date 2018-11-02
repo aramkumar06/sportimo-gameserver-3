@@ -8,6 +8,9 @@ if (mongoose.models.competitions)
     module.exports = mongoose.models.competitions;
 else {
     var competition = {
+        // New in v3
+        teams: [{ type: Schema.Types.ObjectId, ref: 'tournament_teams' }],
+
         name: { type: Schema.Types.Mixed },
         logo: { type: String },
         parserids: { type: Schema.Types.Mixed },
