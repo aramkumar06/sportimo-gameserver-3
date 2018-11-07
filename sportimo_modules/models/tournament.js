@@ -1,14 +1,15 @@
 ﻿'use strict';
 
 var mongoose = require('mongoose'),
-    Schema = mongoose.Schema;
+    Schema = mongoose.Schema,
+    ObjectId = Schema.Types.ObjectId;
 
 
 if (mongoose.models.tournaments)
     module.exports = mongoose.models.tournaments;
 else {
     var tournament = {
-        client: { type: String, ref: 'trn_clients', required: true },
+        client: { type: ObjectId, ref: 'trn_clients', required: true },
         promoImage: { type: String },
         aboutText: { type: Schema.Types.Mixed },
         howToParticipateText: { type: Schema.Types.Mixed },
@@ -18,7 +19,7 @@ else {
         joinUntilDate: { type: Date },
         state: { type: String, enum: ['deleted', 'scheduled', 'active', 'completed'] },
         subscriptionPolicy: { type: String, enum: ['free', 'goldTickets'] },
-        leaderboardDefinition: { type: String, ref: 'pools' },
+        leaderboardDefinition: { type: ObjectId, ref: 'pools' },
         created: { type: Date, default: Date.now },
         updated: { type: Date, default: Date.now }
     };

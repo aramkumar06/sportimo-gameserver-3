@@ -60,8 +60,11 @@ var app = module.exports = exports.app = express();
 var version = "0.9.11";
 // Create Server
 var server = http.createServer(app);
-var port = (process.env.PORT || 3030)
-app.listen(port, function () {
+var port = (process.env.PORT || 3030);
+app.listen(port, function (err) {
+    if (err)
+        console.error(err);
+
     console.log("------------------------------------------------------------------------------------");
     console.log("-------       Sportimo v2.0 Game Server %s listening on port %d        --------", version, port);
     console.log("-------       Environment: " + process.env.NODE_ENV);
@@ -96,7 +99,7 @@ logger.add(winston.transports.Console, {
     colorize: 'level'
 });
 
-if (process.env.NODE_ENV == "production") {
+if (process.env.NODE_ENV === "production") {
     logger.add(winston.transports.File, {
         prettyPrint: true,
         level: 'core',
@@ -176,88 +179,76 @@ try {
         console.error(err.stack);
     });
 
-app.PublishChannel = PublishChannel;
+    app.PublishChannel = PublishChannel;
 
 
-if (!process.env.NODE_ENV)
-    process.env.NODE_ENV = "development";
+    if (!process.env.NODE_ENV)
+        process.env.NODE_ENV = "development";
 
-// process.env.NODE_ENV = "production";
 
-var airbrake;
-if (process.env.NODE_ENV == "development") {
-    airbrake = require('airbrake').createClient(
-        '156316', // Project ID
-        'cf1dc9bb0cb48fcfda489fb05683e3e7' // Project key
-    );
-} else {
-    airbrake = require('airbrake').createClient(
-        '156332', // Project ID
-        '08292120e835e0088180cb09b1a474d0' // Project key
-    );
-}
-airbrake.handleExceptions();
-// throw new Error('I am an uncaught exception');
-// Setup MongoDB conenction
-// var mongoConnection = 'mongodb://bedbug:a21th21@ds043523-a0.mongolab.com:43523,ds043523-a1.mongolab.com:43523/sportimo?replicaSet=rs-ds043523';
-// var mongoConnection = 'mongodb://bedbug:a21th21@ds027835.mongolab.com:27835/sportimov2';
-var mongoConnection = 'mongodb://' + mongoCreds[process.env.NODE_ENV].user + ':' + mongoCreds[process.env.NODE_ENV].password + '@' + mongoCreds[process.env.NODE_ENV].url;
-// if (mongoose.connection.readyState != 1 && mongoose.connection.readyState != 2)
-mongoose.Promise = global.Promise;
+    //var airbrake;
+    //if (process.env.NODE_ENV == "development") {
+    //    airbrake = require('airbrake').createClient(
+    //        '156316', // Project ID
+    //        'cf1dc9bb0cb48fcfda489fb05683e3e7' // Project key
+    //    );
+    //} else {
+    //    airbrake = require('airbrake').createClient(
+    //        '156332', // Project ID
+    //        '08292120e835e0088180cb09b1a474d0' // Project key
+    //    );
+    //}
+    //    airbrake.handleExceptions();
 
-mongoose.connect(mongoConnection, function (err, res) {
-    if (err) {
-        console.log('ERROR connecting to: ' + mongoConnection + '. ' + err);
-    }
-    //  else {
-    //     console.log("[Game Server] MongoDB Connected.");
-    // }
-});
 
-/* Modules */
-// if (process.env.NODE_ENV != "production") {
 
-var liveMatches = require('./sportimo_modules/match-moderation');
-if (PublishChannel && SubscribeChannel)
-    liveMatches.SetupRedis(PublishChannel, SubscribeChannel, redisCreds.channel);
+    // throw new Error('I am an uncaught exception');
+    // Setup MongoDB conenction
+    // var mongoConnection = 'mongodb://bedbug:a21th21@ds043523-a0.mongolab.com:43523,ds043523-a1.mongolab.com:43523/sportimo?replicaSet=rs-ds043523';
+    // var mongoConnection = 'mongodb://bedbug:a21th21@ds027835.mongolab.com:27835/sportimov2';
+    var mongoConnection = 'mongodb://' + mongoCreds[process.env.NODE_ENV].user + ':' + mongoCreds[process.env.NODE_ENV].password + '@' + mongoCreds[process.env.NODE_ENV].url;
+    // if (mongoose.connection.readyState != 1 && mongoose.connection.readyState != 2)
+    mongoose.Promise = global.Promise;
 
-liveMatches.SetupMongoDB(mongoose);
-liveMatches.SetupAPIRoutes(app);
-liveMatches.init(TestSuite.done);
-TestSuite.moderation = liveMatches;
+    mongoose.connect(mongoConnection, function (err, res) {
+        if (err) {
+            console.error('ERROR connecting to: ' + mongoConnection + '. ' + err);
+            process.exit(1);
+        }
+        else {
+            console.log("[Game Server] MongoDB Connected.");
+
+            var liveMatches = require('./sportimo_modules/match-moderation');
+            if (PublishChannel && SubscribeChannel)
+                liveMatches.SetupRedis(PublishChannel, SubscribeChannel, redisCreds.channel);
+
+            liveMatches.SetupMongoDB(mongoose);
+            liveMatches.SetupAPIRoutes(app);
+            liveMatches.init(TestSuite.done);
+            TestSuite.moderation = liveMatches;
+         }
+    });
+
+    /* Modules */
+
+    app.use('/offline_data/', require('./sportimo_modules/offline_data/api/ondemand.js'));
+
+    var leaderboards_module = require('./sportimo_modules/leaderpay');
+
+    var questions_module = require('./sportimo_modules/questions');
+
+
+    var users_module = require('./sportimo_modules/users');
+
+    var data_module = require('./sportimo_modules/data-module');
+
+    var polls_module = require('./sportimo_modules/polls');
+
+    var early_access_module = require('./sportimo_modules/early-access');
 }
 catch (err) {
     console.log(err);
 }
-// }
-
-// var wildcards = require('./sportimo_modules/wildcards');
-//     //wildcards.setRedisPubSub(redisCreds.url, redisCreds.port, redisCreds.secret);
-//     //wildcards.SetupMongoDB(mongoose);
-//     //wildcards.SetupAPIRoutes(app);
-// wildcards.init(mongoose);
-// TestSuite.wildcards = wildcards;
-
-
-app.use('/offline_data/', require('./sportimo_modules/offline_data/api/ondemand.js'));
-
-// var Notifications = require('./sportimo_modules/notifications');
-// Notifications.SetupServer(app);
-// Notifications.setMongoConnection(mongoConnection);
-
-var leaderboards_module = require('./sportimo_modules/leaderpay');
-
-var questions_module = require('./sportimo_modules/questions');
-
-
-var users_module = require('./sportimo_modules/users');
-
-var data_module = require('./sportimo_modules/data-module');
-
-var polls_module = require('./sportimo_modules/polls');
-
-var early_access_module = require('./sportimo_modules/early-access');
-
 
 // var purchases_module = require('./sportimo_modules/purchases');
 // dataModule.SetupMongoDB(mongoose);

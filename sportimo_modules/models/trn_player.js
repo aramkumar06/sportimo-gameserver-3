@@ -9,8 +9,6 @@ if (mongoose.models.trn_players)
 else {
     var player = {
         name: { type: Schema.Types.Mixed },
-        firstName: { type: Schema.Types.Mixed },
-        lastName: { type: Schema.Types.Mixed },
         pic: { type: String },
         position: { type: String },
         personalData: { type: Schema.Types.Mixed },

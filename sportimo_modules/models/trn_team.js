@@ -5,8 +5,8 @@ var mongoose = require('mongoose'),
 
 
 var eventstat = new Schema({
-    home_team: { type: String, ref: 'tournament_teams' },
-    away_team: { type: String, ref: 'tournament_teams' },
+    home_team: { type: String, ref: 'trn_teams' },
+    away_team: { type: String, ref: 'trn_teams' },
     start: { type: Date },
     homescore: 0,
     awayscore: 0
@@ -17,7 +17,7 @@ if (mongoose.models.trn_teams)
 else {
     var team = {
         name: { type: Schema.Types.Mixed },
-        abr: { type: String },
+        abbr: { type: String },
         logo: { type: String },
         color: { type: String },
         stats: { type: Schema.Types.Mixed },

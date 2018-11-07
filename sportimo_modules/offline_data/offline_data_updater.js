@@ -40,12 +40,11 @@ offlineDataUpdater.Init = function()
 {
 };
 
-var stats = require("./parsers/Stats.js");
 //stats.TestGuruStats(function() {});
 
 var statscore = require('./parsers/Statscore');
 
-//var competitionId = "56f4800fe4b02f2226646297";	// Premier League
+var competitionId = "56f4800fe4b02f2226646297";	// Premier League
 //var competitionId = "577ec1011916317238fd2f33";	// Germany Bundesliga
 //var competitionId = "577ec1381916317238fd2f34";	// Italy serie A
 //var competitionId = "577ec1a61916317238fd2f36";	// Spain Liga Primera
@@ -67,7 +66,7 @@ var statscore = require('./parsers/Statscore');
 //var competitionId = "5b5a24448b3e30b41dacb3cf";	// International Champions Cup
 //var competitionId = "5b5a36b38b3e30b41dacb3e0";	// UEFA Super Cup
 //var competitionId = "5b8f80468b3e30b41dacd016";	// UEFA Nations League
-var competitionId = "5bbd9d4ac7cc110d8f3979e8";	// International Friendlies
+//var competitionId = "5bbd9d4ac7cc110d8f3979e8";	// International Friendlies
 
 
 if (competitionId) {
@@ -87,6 +86,7 @@ if (competitionId) {
                 if (err)
                     console.error(err.stack);
                 console.log("Operation terminated");
+                process.exit(0);
             });
         }, 5000);
     } catch (err) {

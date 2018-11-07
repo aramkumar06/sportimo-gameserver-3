@@ -1,15 +1,17 @@
 ﻿'use strict';
 
 var mongoose = require('mongoose'),
-    Schema = mongoose.Schema;
+    Schema = mongoose.Schema,
+    ObjectId = Schema.Types.ObjectId;
 
 
 if (mongoose.models.trn_teamstats)
     module.exports = mongoose.models.trn_teamstats;
 else {
     var teamStats = {
-        team: { type: Schema.Types.ObjectId, ref: 'trn_teams' },
-        competition: { type: Schema.Types.ObjectId, ref: 'competitions' },
+        team: { type: ObjectId, ref: 'trn_teams' },
+        competition: { type: ObjectId, ref: 'competitions' },
+        season: { type: Schema.Types.Mixed },
 
         recentform: [String], // an array of String of type "W","L","D"
         nextmatch: Schema.Types.Mixed,
@@ -28,8 +30,25 @@ else {
                 "goalsAgainst": 0
             }
         },
-        topscorer: { type: Schema.Types.ObjectId, ref: 'trn_players' },
-        topassister: { type: Schema.Types.ObjectId, ref: 'trn_players' },
+        stats: {
+            type: Schema.Types.Mixed,
+            default: {
+                "Own_Goal": 0,
+                "gamesPlayed": 0,
+                "Goal": 0,
+                "Shot_On_Goal": 0,
+                "Crosses": 0,
+                "Penalty": 0,
+                "Foul": 0,
+                "Yellow": 0,
+                "Red": 0,
+                "Offside": 0,
+                "Corner": 0,
+                "Clear": 0
+            }
+        },
+        topscorer: { type: ObjectId, ref: 'trn_players' },
+        topassister: { type: ObjectId, ref: 'trn_players' },
 
         created: { type: Date, default: Date.now },
         updated: { type: Date }

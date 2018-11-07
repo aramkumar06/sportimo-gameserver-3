@@ -45,84 +45,88 @@ var Achievements = mongoose.model('achievements', achievement);
 
 var UserSchema = new Schema(
     {
-    name: {
-        type: String
-        // ,required: true
+        name: {
+            type: String
+            // ,required: true
+        },
+        username: {
+            type: String,
+            required: true
+        },
+        client: {
+            type: Schema.Types.ObjectId,
+            ref: 'trn_clients'
+        },
+        password: {
+            type: String,
+            required: true
+        },
+        email: {
+            type: String,
+            required: true,
+            unique: true
+        },
+        picture: String,
+        inbox: [{
+            type: String,
+            ref: 'messages'
+        }],
+        unread: { type: Number, default: 1 },
+        social_id: {
+            type: String,
+            unique: true,
+            required: false
+        },
+        // The following field is going to be used for the single frictionless sign on
+        social_ids: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {},
+            required: false
+        },
+        pushToken: { type: String, default: "NoPustTokenYet" },
+        pushSettings: {
+            type: mongoose.Schema.Types.Mixed, default: {
+                all: true,
+                new_message: true,
+                match_reminder: true,
+                kick_off: true,
+                goals: true,
+                won_cards: true,
+                final_result: true
+            }
+        },
+        resetToken: String,
+        country: { type: String, required: false, default: "GR" },
+        msisdn: String,
+        customerType: { type: String, default: "free" },
+        subscriptionEnd: { type: Date, default: "02/28/2017" },
+        subscriptionContractId: String,
+        subscription: { type: mongoose.Schema.Types.Mixed },
+        pinCode: String,
+        birth: String,
+        gender: String,
+        admin: Boolean,
+        rankingStats: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {
+                bestRank: 9999,
+                bestRankMatch: null,
+                bestScore: 0,
+                bestScoreMatch: null
+            }
+        },
+        stats: mongoose.Schema.Types.Mixed,
+        level: { type: Number, default: 0 },
+        achievements: [achievement],
+        blockedusers: [String],
+        favoriteteams: [String],
+        unlockedmatches: [String],
+        isOnline: { type: Boolean, default: false },
+        deletedAt: { type: Date },
+        deletionReason: { type: String },
+        lastLoginAt: { type: Date }
     },
-    username: {
-        type: String,
-        required: true
-    },
-    password: {
-        type: String,
-        required: true
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true
-    },
-    picture: String,
-    inbox: [{
-        type: String,
-        ref: 'messages'
-    }],
-    unread: {type: Number, default: 1},
-    social_id: {
-        type: String,
-        unique: true,
-        required: false
-    },
-    // The following field is going to be used for the single frictionless sign on
-    social_ids: {
-        type: mongoose.Schema.Types.Mixed,
-        default: {},
-        required: false
-    },
-    pushToken: { type: String, default: "NoPustTokenYet" },
-    pushSettings: {
-        type: mongoose.Schema.Types.Mixed, default: {
-            all: true,
-            new_message: true,
-            match_reminder: true,
-            kick_off: true,
-            goals: true,
-            won_cards: true,
-            final_result: true
-        }
-    },
-    resetToken: String,
-    country: { type: String, required: false, default: "GR" },
-    msisdn: String,
-    customerType: {type: String, default:"free"},
-    subscriptionEnd: {type:Date, default: "02/28/2017"},
-    subscriptionContractId: String,
-    subscription: {type: mongoose.Schema.Types.Mixed},
-    pinCode: String,
-    birth: String,
-    gender: String,
-    admin: Boolean,
-    rankingStats: {
-        type: mongoose.Schema.Types.Mixed,
-        default: {
-            bestRank: 9999,
-            bestRankMatch: null,
-            bestScore: 0,
-            bestScoreMatch: null
-        }
-    },
-    stats: mongoose.Schema.Types.Mixed,
-    level: { type: Number, default: 0 },
-    achievements: [achievement],
-    blockedusers: [String],
-    favoriteteams: [String],
-    unlockedmatches: [String],
-    isOnline: { type: Boolean, default: false },
-    deletedAt: { type: Date },
-    deletionReason: { type: String },
-    lastLoginAt: { type: Date }
-}, 
-{
+    {
         timestamps: { updatedAt: 'lastActive' },
         toObject: {
             virtuals: true

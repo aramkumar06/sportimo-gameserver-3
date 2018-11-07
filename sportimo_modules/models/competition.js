@@ -9,7 +9,7 @@ if (mongoose.models.competitions)
 else {
     var competition = {
         // New in v3
-        teams: [{ type: Schema.Types.ObjectId, ref: 'tournament_teams' }],
+        teams: [{ type: Schema.Types.ObjectId, ref: 'trn_teams' }],
 
         name: { type: Schema.Types.Mixed },
         logo: { type: String },

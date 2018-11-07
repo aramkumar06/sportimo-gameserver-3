@@ -10,7 +10,7 @@ else {
     var tournamentMatch = {
         client: { type: Schema.Types.ObjectId, ref: 'trn_clients' },
         tournament: { type: Schema.Types.ObjectId, ref: 'tournaments', required: true },
-        scheduledMatch: { type: Schema.Types.ObjectId, ref: 'scheduled_matches' },
+        match: { type: Schema.Types.ObjectId, ref: 'matches' },
         leaderboardDefinition: { type: Schema.Types.ObjectId, ref: 'trn_leaderboard_defs' },
         isHidden: { type: Boolean, default: false },        // when true, the match is not visible by the registered client apps and is reserved for future uses (overrides scheduled_match disabled field)
 

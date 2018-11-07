@@ -8,12 +8,12 @@ if (mongoose.models.trn_leaderboard_defs)
     module.exports = mongoose.models.trn_leaderboard_defs;
 else {
 
-    var prizeDef = {
+    var prizeSchema = new Schema({
         rank: { type: Number, min: 0 },
         rank_from: { type: Number, min: 0 },
         rank_to: { type: Number, min: 0 },
         prize: { type: Schema.Types.ObjectId, ref: 'prizes' }
-    };
+    });
 
     var leaderboarddef = {
 
@@ -30,7 +30,7 @@ else {
         // The number of best scores per user. If null leaderboard is comprised by all user scores.  
         bestscores: Number,
 
-        prizes: [{ type: prizeDef }],
+        prizes: [{ type: prizeSchema }],
 
         // conditions: [{ condition: "Country", value:["GR","UK","SA"]}, {condition: "Age", value:["17"]}]
         country: [{ type: String }],

@@ -12,7 +12,7 @@ else {
         description: { type: Schema.Types.Mixed },
         contactAddress: { type: String },
         logo: { type: String },
-        promoText: { type: String },
+        promoText: { type: Schema.Types.Mixed },
         created: { type: Date, default: Date.now },
         updated: { type: Date, default: Date.now }
     };

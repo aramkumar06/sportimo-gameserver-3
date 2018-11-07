@@ -177,10 +177,12 @@ Parser.GetSeasonYear = function () {
 };
 
 
-Parser.FindCompetitionByParserid = function (leagueName, callback) {
+Parser.FindCompetitionByParserid = function (leagueName, injectTeams, callback) {
     var findQuery = { 'parserids.Statscore': leagueName };
 
     var q = mongoDb.competitions.findOne(findQuery);
+    if (injectTeams)
+        q.populate(teams);
 
     q.exec(function (error, competition) {
         if (error)
@@ -191,7 +193,7 @@ Parser.FindCompetitionByParserid = function (leagueName, callback) {
 
         return callback(null, competition);
     });
-}
+};
 
 // Helper method to retrieve a team based on the parser id
 Parser.FindMongoTeamId = function (competitionId, parserid, fieldProjection, callback, teamId) {
@@ -201,7 +203,7 @@ Parser.FindMongoTeamId = function (competitionId, parserid, fieldProjection, cal
     if (teamId)
         findConditions._id = teamId;
 
-    var q = mongoDb.teams.findOne(findConditions);
+    var q = mongoDb.trn_teams.findOne(findConditions);
 
     if (fieldProjection)
         q.select(fieldProjection);
@@ -217,13 +219,13 @@ Parser.FindMongoTeamId = function (competitionId, parserid, fieldProjection, cal
     });
 };
 
-Parser.FindMongoTeamsInCompetition = function (competitionId, callback) {
-    mongoDb.teams.find({ competitionid: competitionId, ['parserids.' + Parser.Name]: { $exists: true } }, function (error, teams) {
-        if (error)
-            return callback(error);
-        callback(null, teams);
-    });
-};
+//Parser.FindMongoTeamsInCompetition = function (competitionId, callback) {
+//    mongoDb.trn_teams.find({ competitionid: competitionId, ['parserids.' + Parser.Name]: { $exists: true } }, function (error, teams) {
+//        if (error)
+//            return callback(error);
+//        callback(null, teams);
+//    });
+//};
 
 
 // Get team stats. Always return the season stats.
@@ -239,16 +241,11 @@ Parser.UpdateTeamStatsFull = function (parserCompetitionId, teamId, season, outt
     async.waterfall(
         [
             function (callback) {
-                return Parser.FindCompetitionByParserid(parserCompetitionId, callback);
+                return Parser.FindCompetitionByParserid(parserCompetitionId, true, callback);
             },
             function (competitionRef, callback) {
                 competition = competitionRef;
-                return mongoDb.teams.find({ competitionid: competition.id, ['parserids.' + Parser.Name]: { $exists: true } }, callback);
-                //return Parser.FindMongoTeamId(competition.id, teamId, false, callback, mongoTeamId);
-            },
-            (mongoTeams, cbk) => {
-
-                mongoTeamsLookup = _.keyBy(_.filter(mongoTeams, (i) => { return i.parserids && i.parserids[Parser.Name]; }), parserIdName);
+                mongoTeamsLookup = _.keyBy(_.filter(competition.teams, (i) => { return i.parserids && i.parserids[Parser.Name]; }), parserIdName);
                 const team = mongoTeamsLookup[teamId];
 
                 if (!authToken || !authTokenExpiration || now > authTokenExpiration)
@@ -451,29 +448,24 @@ Parser.UpdateTeamStatsFull = function (parserCompetitionId, teamId, season, outt
 // Parser methods that other modules may call:
 
 Parser.UpdateCompetitionTeamsStats = function (competitionId, season, callback) {
-    mongoDb.competitions.findById(competitionId, function (competitionError, competition) {
+    mongoDb.competitions.findById(competitionId).populate('teams').exec(function (competitionError, competition) {
         if (competitionError)
             return callback(competitionError);
 
         if (!competition.parserids || !competition.parserids[Parser.Name])
             return callback(new Error('No proper parserids found in selected competition with id ' + competitionId));
 
-        Parser.FindMongoTeamsInCompetition(competitionId, function (error, teams) {
-            if (error)
-                return callback(error);
-
-            async.eachSeries(teams, function (team, cbk) {
-                Parser.UpdateTeamStats(competition.parserids[Parser.Name], team.parserids[Parser.Name], season, function (teamError, updateOutcome) {
-                    if (teamError)
-                        log.error(teamError.message);
-                    cbk(null);
-                });
-            }, function (seriesErr) {
-                if (seriesErr)
-                    log.error(seriesErr.message);
-
-                callback(null);
+        async.eachSeries(competition.teams, function (team, cbk) {
+            Parser.UpdateTeamStats(competition.parserids[Parser.Name], team.parserids[Parser.Name], season, function (teamError, updateOutcome) {
+                if (teamError)
+                    log.error(teamError.message);
+                cbk(null);
             });
+        }, function (seriesErr) {
+            if (seriesErr)
+                log.error(seriesErr.message);
+
+            callback(null);
         });
     });
 };
@@ -607,18 +599,29 @@ const UpdateTeamStats = function (teamMatches, teamId) {
     return stats;
 };
 
+
+
 Parser.UpdateTeams = function (competitionId, callback) {
     let mongoCompetition = null;
+
     let mongoTeams = [];
     let mongoTeamsLookup = {};
+
     let mongoPlayers = [];
     let mongoPlayersLookup = {};
+
+    let mongoTeamStats = [];
+    let mongoTeamStatsLookup = [];
+
+    let mongoPlayerStats = [];
+    let mongoPlayerStatsLookup = [];
+
     let parserTeams = [];
     let parserPlayers = [];
-    let mongoTeamsWithParserIds = [];
-    let mongoPlayersWithParserIds = [];
+
     let standingTypes = [];
     let standingsLookup = {};
+
     let topScorers = [];
     let leagueMatches = [];
 
@@ -627,7 +630,7 @@ Parser.UpdateTeams = function (competitionId, callback) {
     async.waterfall([
         // Get competition [Mongo]
         (cbk) => {
-            return mongoDb.competitions.findById(competitionId, cbk);
+            return mongoDb.competitions.findById(competitionId).populate({ path: 'teams', populate: { path: 'players' } }).exec(cbk);
         },
         // Get competition teams [Mongo]
         (competition, cbk) => {
@@ -635,37 +638,43 @@ Parser.UpdateTeams = function (competitionId, callback) {
             if (!mongoCompetition.parserids || !mongoCompetition.parserids[Parser.Name] || !mongoCompetition.parserids[Parser.Name].id || !mongoCompetition.parserids[Parser.Name].seasonid) {
                 return cbk(new Error(`Cannot proceed to update teams and players for competition ${competitionId} does not have valid ${Parser.Name} parserids.`));
             }
+            if (!mongoCompetition.teams)
+                mongoCompetition.teams = [];
 
-
-            mongoDb.teams.find({ competitionid: competitionId, ['parserids.' + Parser.Name]: {$exists: true} }, function (teamError, existingTeams) {
-                if (teamError)
-                    return cbk(teamError);
-
-                mongoTeams = existingTeams;
-                mongoTeamsLookup = _.keyBy(_.filter(existingTeams, (i) => { return i.parserids && i.parserids[Parser.Name]; }), parserIdName);
-
-                return cbk(null, mongoTeams);
-            });
-        },
-        // Get team players
-        (mongoTeams, cbk) => {
+            mongoTeams = competition.teams;
+            mongoTeamsLookup = _.keyBy(_.filter(mongoTeams, (i) => { return i.parserids && i.parserids[Parser.Name]; }), parserIdName);
             const mongoTeamIds = _.map(mongoTeams, 'id');
 
-            return mongoDb.players.find({ teamId: { $in: mongoTeamIds }, ['parserids.' + Parser.Name]: { $exists: true } }, cbk);
-        },
-        // Get standing types, parser teams [Statscore API]
-        (players, cbk) => {
-            mongoPlayers = players;
-            mongoPlayersLookup = _.keyBy(_.filter(players, (i) => { return i.parserids && i.parserids[Parser.Name]; }), parserIdName);
+            mongoPlayers = _.flatMap(mongoTeams, 'players');
+            mongoPlayersLookup = _.keyBy(_.filter(mongoPlayers, (i) => { return i.parserids && i.parserids[Parser.Name]; }), parserIdName);
 
             const competitionParserId = mongoCompetition.parserids[Parser.Name];
-            const competitionParserSeasonId = mongoCompetition.parserids[Parser.Name].seasonid;
+            const competitionParserSeasonId = mongoCompetition.parserids[Parser.Name].seasonid || mongoCompetition.season;
             async.parallel([
                 (innerCbk) => {
                     return Parser.GetStandingTypes(competitionParserId, competitionParserSeasonId, innerCbk);
                 },
                 (innerCbk) => {
                     return Parser.GetLeagueTeams(competitionParserId, innerCbk);
+                },
+                (innerCbk) => {
+                    const teamObjectIds = _.map(mongoCompetition.teams, '_id');
+                    return mongoDb.trn_teamstats.find({
+                        competition: mongoCompetition._id,
+                        season: { [Parser.Name]: competitionParserSeasonId },
+                        team: { $in: teamObjectIds }
+                    }).populate('team').exec(innerCbk);
+                },
+                (innerCbk) => {
+                    async.concat(mongoCompetition.teams, (team, icbk) => {
+                        const playerObjectIds = _.map(team.players, '_id');
+                        return mongoDb.trn_playerstats.find({
+                            competition: mongoCompetition._id,
+                            season: { [Parser.Name]: competitionParserSeasonId },
+                            team: team._id,
+                            player: { $in: playerObjectIds }
+                        }).populate('player').exec(icbk);
+                    }, innerCbk);
                 }
             ], (err, asyncResult) => {
                 if (err) {
@@ -674,6 +683,16 @@ Parser.UpdateTeams = function (competitionId, callback) {
 
                 standingTypes = asyncResult[0];
                 parserTeams = asyncResult[1];
+
+                mongoTeamStats = asyncResult[2];
+                mongoTeamStatsLookup = _.keyBy(_.filter(mongoTeamStats, (t) => { return t.team && t.team.parserids && t.team.parserids[Parser.Name]; }), (t) => {
+                    return t.team.parserids[Parser.Name]; 
+                });
+                mongoPlayerStats = asyncResult[3];
+                mongoPlayerStatsLookup = _.keyBy(_.filter(mongoPlayerStats, (p) => { return p.player && p.player.parserids && p.player.parserids[Parser.Name]; }), (p) => {
+                    return p.player.parserids[Parser.Name];
+                });
+
 
                 return cbk(null, standingTypes, parserTeams);
             });
@@ -714,12 +733,6 @@ Parser.UpdateTeams = function (competitionId, callback) {
                 },
                 (innerCbk) => {
                     return Parser.GetLeagueSeasonEvents(competitionParserId.seasonid, null, innerCbk);
-                },
-                // Find rogue teams in Mongo with same parser ids that we can get their names and other permanent properties [Mongo]
-                (innerCbk) => {
-                    const parserTeamIds = _.map(parserTeams, 'id');
-
-                    return mongoDb.teams.find({ ['parserids.' + Parser.Name]: { $in: parserTeamIds } }, innerCbk);
                 }
             ], (err, asyncResult) => {
                 if (err)
@@ -733,22 +746,14 @@ Parser.UpdateTeams = function (competitionId, callback) {
 
                 topScorers = asyncResult[2];
                 leagueMatches = asyncResult[3];
-                mongoTeamsWithParserIds = asyncResult[4];
 
                 return cbk(null, parserTeams);
             });
-        },
-        (parserTeams, cbk) => {
-            const parserPlayerIds = _.map(parserPlayers, 'id');
-
-            return mongoDb.players.find({ [parserIdName]: { $in: parserPlayerIds } }, cbk);
         }
-    ], (waterfallErr, waterfallResults) => {
+    ], (waterfallErr) => {
         if (waterfallErr) {
             return callback(waterfallErr);
         }
-
-        mongoPlayersWithParserIds = waterfallResults;
 
         let teamsToAdd = [];
         let teamsToUpdate = [];
@@ -756,7 +761,8 @@ Parser.UpdateTeams = function (competitionId, callback) {
         let playersToAdd = [];
         let playersToUpdate = [];
         let playersToRemove = [];
-        let playerParserIdsToAddUpdate = {};
+        let teamParserIdsToAddUpdate = {};
+        const competitionParserSeasonId = mongoCompetition.parserids[Parser.Name].seasonid || mongoCompetition.season;
 
         const creationDate = new Date();
 
@@ -764,7 +770,8 @@ Parser.UpdateTeams = function (competitionId, callback) {
         _.forEach(parserTeams, (team) => {
             let mongoTeam = null;
 
-            let mongoTeamsWithParserId = _.filter(mongoTeamsWithParserIds, (t) => { return t.parserids[Parser.Name] === team.id; });
+            teamParserIdsToAddUpdate[team.id] = true;
+            let playerParserIdsToAddUpdate = {};
 
             if (mongoTeamsLookup[team.id]) {
                 // Update team
@@ -778,68 +785,209 @@ Parser.UpdateTeams = function (competitionId, callback) {
                     mongoTeam.name.en = team.name;
                     mongoTeam.markModified('name.en');
                 }
-                if (!mongoTeam.name.abbr) {
-                    mongoTeam.name.abbr = team.short_name;
-                    mongoTeam.markModified('name.abbr');
+                if (!mongoTeam.shortName) {
+                    mongoTeam.shortName = {};
+                    mongoTeam.markModified('shortName');
                 }
-                if (!mongoTeam.name.ar) {
-                    let teamWithNameAr = _.find(mongoTeamsWithParserId, (t) => { return t.parserids[Parser.Name] === team.id && t.name && t.name.ar; });
-                    if (teamWithNameAr) {
-                        mongoTeam.name.ar = teamWithNameAr.name.ar;
-                        mongoTeam.markModified('name.ar');
-                    }
+                if (!mongoTeam.shortName.en) {
+                    mongoTeam.shortName.en = team.short_name;
+                    mongoTeam.markModified('shortName.en');
                 }
-                if (!mongoTeam.logo) {
-                    let teamWithLogo = _.find(mongoTeamsWithParserId, (t) => { return t.parserids[Parser.Name] === team.id && t.logo; });
-                    if (teamWithLogo) {
-                        mongoTeam.logo = teamWithLogo.logo;
-                    }
-                }
+                if (!mongoTeam.abbr)
+                    mongoTeam.abbr = team.acronym;
                 mongoTeam.updated = creationDate;
 
                 teamsToUpdate.push(mongoTeam);
             }
             else {
-                // Search for existing team with same id
-                mongoTeam = _.find(mongoTeamsWithParserIds, { parserIdName: team.id }); 
 
-                var newTeam = new mongoDb.teams();
-                newTeam._id = new objectId();
+                var newTeam = new mongoDb.trn_teams();
+                //newTeam._id = new objectId();
                 newTeam.name = { "en": team.name };
-                newTeam.name["abbr"] = team.short_name;
+                newTeam.shortName = { "en": team.short_name };
+                newTeam.abbr = team.acronym;
                 newTeam.logo = null;
-                //newTeam.league = leagueName;
-                newTeam.created = creationDate;
                 newTeam.parserids = {};
                 newTeam.parserids[Parser.Name] = team.id;
                 newTeam.markModified('parserids.' + Parser.Name);
-                newTeam.competitionid = competitionId;
-
-                if (mongoTeam) {
-                    // Update from found mongoTeam
-                    newTeam.name = mongoTeam.name;
-                    newTeam.markModified('name');
-                    newTeam.logo = mongoTeam.logo;
-
-                    if (!newTeam.name.ar) {
-                        let teamWithNameAr = _.find(mongoTeamsWithParserId, (t) => { return t.parserids[Parser.Name] === team.id && t.name && t.name.ar; });
-                        if (teamWithNameAr) {
-                            newTeam.name.ar = teamWithNameAr.name.ar;
-                            newTeam.markModified('name.ar');
-                        }
-                    }
-                    if (!newTeam.logo) {
-                        let teamWithLogo = _.find(mongoTeamsWithParserId, (t) => { return t.parserids[Parser.Name] === team.id && t.logo; });
-                        if (teamWithLogo) {
-                            newTeam.logo = teamWithLogo.logo;
-                        }
-                    }
-                }
+                newTeam.created = creationDate;
                 newTeam.updated = creationDate;
+                newTeam.players = [];
 
                 mongoTeam = newTeam;
+
+                mongoCompetition.teams.push(newTeam);
+                mongoTeamsLookup[team.id] = newTeam;
                 teamsToAdd.push(newTeam);
             }
+
+            // Check team stats and insert or update
+            if (mongoTeamStatsLookup[team.id]) {
+                let mongoTeamStatsInstance = mongoTeamStatsLookup[team.id];
+                const teamParserId = team.id;
+
+                // Fill in with standings all teams to be updated and inserted
+                if (standingsLookup[teamParserId]) {
+                    mongoTeamStatsInstance.standing = TranslateTeamStanding(standingsLookup[teamParserId], team);
+                    mongoTeamStatsInstance.markModified('standing');
+                }
+
+                // Fill in with recent form data of last 5 matches
+                const teamStats = standingsLookup[teamParserId];
+                if (teamStats && teamStats.columns) {
+                    const recentFormColumn = _.find(teamStats.columns, { id: 46 });
+                    if (recentFormColumn)
+                        mongoTeamStatsInstance.recentForm = TranslateRecentForm(recentFormColumn.value);
+                }
+
+                // Fill in with last and next match and stats so far for each team to be either updated or inserted
+                let teamMatches = _.filter(leagueMatches, (m) => {
+                    return m.participants && m.participants.length == 2 && (m.participants[0].id == teamParserId || m.participants[1].id == teamParserId);
+                });
+                teamMatches = _.orderBy(teamMatches, (match) => {
+                    return moment.utc(match.start_date);
+                });
+                const lastMatch = _.findLast(teamMatches, { status_type: 'finished' });
+                let nextMatch = null;
+                if (!lastMatch)
+                    mongoTeamStatsInstance.lastmatch = null;
+                else {
+                    const lastMatchIndex = _.indexOf(teamMatches, lastMatch);
+                    const lastMatchHome = _.find(lastMatch.participants, { counter: 1 });
+                    const lastMatchAway = _.find(lastMatch.participants, { counter: 2 });
+                    const lastMatchHomeMongoTeam = mongoTeamsLookup[lastMatchHome.id];
+                    const lastMatchAwayMongoTeam = mongoTeamsLookup[lastMatchAway.id];
+                    const lastMatchObj = {
+                        home: _.pick(lastMatchHomeMongoTeam, ['_id', 'name', 'logo']),
+                        away: _.pick(lastMatchAwayMongoTeam, ['_id', 'name', 'logo']),
+                        homescore: parseInt(_.find(lastMatchHome.results, { id: 2 }).value, 10),
+                        awayscore: parseInt(_.find(lastMatchAway.results, { id: 2 }).value, 10),
+                        eventdate: moment.utc(lastMatch.start_date).toDate()
+                    };
+                    mongoTeamStatsInstance.lastmatch = lastMatchObj;
+
+                    // next match
+                    nextMatch = lastMatchIndex + 1 < teamMatches.length ? teamMatches[lastMatchIndex + 1] : null;
+                }
+                mongoTeamStatsInstance.markModified('lastmatch');
+
+                if (!nextMatch)
+                    nextMatch = _.find(teamMatches, { status_type: 'scheduled' });
+                if (nextMatch && nextMatch.status_type == 'scheduled') {
+                    const nextMatchHome = _.find(nextMatch.participants, { counter: 1 });
+                    const nextMatchAway = _.find(nextMatch.participants, { counter: 2 });
+                    const nextMatchHomeMongoTeam = mongoTeamsLookup[nextMatchHome.id];
+                    const nextMatchAwayMongoTeam = mongoTeamsLookup[nextMatchAway.id];
+                    const nextMatchObj = {
+                        home: _.pick(nextMatchHomeMongoTeam, ['_id', 'name', 'logo']),
+                        away: _.pick(nextMatchAwayMongoTeam, ['_id', 'name', 'logo']),
+                        homescore: 0,
+                        awayscore: 0,
+                        eventdate: moment.utc(nextMatch.start_date).toDate()
+                    };
+                    mongoTeamStatsInstance.nextmatch = nextMatchObj;
+                }
+                else
+                    mongoTeamStatsInstance.nextmatch = null;
+                mongoTeamStatsInstance.markModified('nextmatch');
+
+
+                // Fill in with top scorers
+                const topTeamScorer = _.find(topScorers, { subparticipant_id: teamParserId });
+                if (topTeamScorer && mongoPlayersLookup[topTeamScorer.id])
+                    mongoTeamStatsInstance.topscorer = mongoPlayersLookup[topTeamScorer.id]._id;
+
+                // Fill in with stats from league matches all teams to be updated and inserted
+                mongoTeamStatsInstance.stats = UpdateTeamStats(teamMatches, teamParserId);
+                mongoTeamStatsInstance.markModified('stats');
+            }
+            else {
+                let mongoTeamStatsInstance = new mongoDb.trn_teamstats();
+                mongoTeamStatsInstance.competition = mongoCompetition;
+                mongoTeamStatsInstance.season = { [Parser.Name]: competitionParserSeasonId };
+                mongoTeamStatsInstance.team = mongoTeamsLookup[team.id];
+                const teamParserId = team.id;
+
+                // Fill in with standings all teams to be updated and inserted
+                if (standingsLookup[teamParserId])
+                    mongoTeamStatsInstance.standing = TranslateTeamStanding(standingsLookup[teamParserId], team);
+
+                // Fill in with recent form data of last 5 matches
+                const teamStats = standingsLookup[teamParserId];
+                if (teamStats && teamStats.columns) {
+                    const recentFormColumn = _.find(teamStats.columns, { id: 46 });
+                    if (recentFormColumn)
+                        mongoTeamStatsInstance.recentForm = TranslateRecentForm(recentFormColumn.value);
+                }
+
+                // Fill in with last and next match and stats so far for each team to be either updated or inserted
+                let teamMatches = _.filter(leagueMatches, (m) => {
+                    return m.participants && m.participants.length === 2 && (m.participants[0].id === teamParserId || m.participants[1].id === teamParserId);
+                });
+                teamMatches = _.orderBy(teamMatches, (match) => {
+                    return moment.utc(match.start_date);
+                });
+                const lastMatch = _.findLast(teamMatches, { status_type: 'finished' });
+                let nextMatch = null;
+                if (!lastMatch)
+                    mongoTeamStatsInstance.lastmatch = null;
+                else {
+                    const lastMatchIndex = _.indexOf(teamMatches, lastMatch);
+                    const lastMatchHome = _.find(lastMatch.participants, { counter: 1 });
+                    const lastMatchAway = _.find(lastMatch.participants, { counter: 2 });
+                    const lastMatchHomeMongoTeam = mongoTeamsLookup[lastMatchHome.id];
+                    const lastMatchAwayMongoTeam = mongoTeamsLookup[lastMatchAway.id];
+                    const lastMatchObj = {
+                        home: _.pick(lastMatchHomeMongoTeam, ['_id', 'name', 'logo']),
+                        away: _.pick(lastMatchAwayMongoTeam, ['_id', 'name', 'logo']),
+                        homescore: parseInt(_.find(lastMatchHome.results, { id: 2 }).value, 10),
+                        awayscore: parseInt(_.find(lastMatchAway.results, { id: 2 }).value, 10),
+                        eventdate: moment.utc(lastMatch.start_date).toDate()
+                    };
+                    mongoTeamStatsInstance.lastmatch = lastMatchObj;
+
+                    // next match
+                    nextMatch = lastMatchIndex + 1 < teamMatches.length ? teamMatches[lastMatchIndex + 1] : null;
+                }
+
+                if (!nextMatch)
+                    nextMatch = _.find(teamMatches, { status_type: 'scheduled' });
+                if (nextMatch && nextMatch.status_type === 'scheduled') {
+                    const nextMatchHome = _.find(nextMatch.participants, { counter: 1 });
+                    const nextMatchAway = _.find(nextMatch.participants, { counter: 2 });
+                    const nextMatchHomeMongoTeam = mongoTeamsLookup[nextMatchHome.id];
+                    const nextMatchAwayMongoTeam = mongoTeamsLookup[nextMatchAway.id];
+                    const nextMatchObj = {
+                        home: _.pick(nextMatchHomeMongoTeam, ['_id', 'name', 'logo']),
+                        away: _.pick(nextMatchAwayMongoTeam, ['_id', 'name', 'logo']),
+                        homescore: 0,
+                        awayscore: 0,
+                        eventdate: moment.utc(nextMatch.start_date).toDate()
+                    };
+                    mongoTeamStatsInstance.nextmatch = nextMatchObj;
+                }
+                else
+                    mongoTeamStatsInstance.nextmatch = null;
+
+                // Fill in with top scorers
+                const topTeamScorer = _.find(topScorers, { subparticipant_id: teamParserId });
+                if (topTeamScorer && mongoPlayersLookup[topTeamScorer.id])
+                    mongoTeamStatsInstance.topscorer = mongoPlayersLookup[topTeamScorer.id]._id;
+
+
+                // Fill in with stats from league matches all teams to be updated and inserted
+                mongoTeamStatsInstance.stats = UpdateTeamStats(teamMatches, teamParserId);
+                mongoTeamStats.push(mongoTeamStatsInstance);
+            }
+
+
+
+            let teamPlayerLookup = _.keyBy(mongoTeam.players, (p) => {
+                if (!p || !p.parserids || !p.parserids[Parser.Name])
+                    return;
+
+                return p.parserids[Parser.Name];
+            });
 
             // Find which players should be inserted, updated, and deleted
             if (team.players)
@@ -847,86 +995,40 @@ Parser.UpdateTeams = function (competitionId, callback) {
 
                     playerParserIdsToAddUpdate[player.id] = true;
 
-                    if (mongoPlayersLookup[player.id]) {
-                        let mongoPlayer = mongoPlayersLookup[player.id];
-                        const mongoPlayerSameId = _.find(mongoPlayersWithParserIds, (i) => { return i.parserids && i.parserids[Parser.Name] === player.id; }); 
+                    if (teamPlayerLookup[player.id]) {
+                        let mongoPlayer = teamPlayerLookup[player.id];
 
                         // Update player
-                        if (!mongoPlayer.firstName) {
-                            mongoPlayer.firstName = {};
-                            mongoPlayer.markModified('firstName');
-                        }
-                        if (!mongoPlayer.lastName) {
-                            mongoPlayer.lastName = {};
-                            mongoPlayer.markModified('lastName');
-                        }
                         if (!mongoPlayer.name) {
                             mongoPlayer.name = {};
                             mongoPlayer.markModified('name');
                         }
+                        if (!mongoPlayer.shortName) {
+                            mongoPlayer.shortName = {};
+                            mongoPlayer.markModified('shortName');
+                        }
+                        if (!mongoPlayer.name.en) {
+                            mongoPlayer.name.en = player.name;
+                            mongoPlayer.markModified('name.en');
+                        }
+
                         if (!mongoPlayer.personalData)
                             mongoPlayer.personalData = {};
-                        const nameParts = _.split(player.name, ' ');
-                        if (nameParts.length > 1) {
-                            if (!mongoPlayer.firstName.en)
-                                mongoPlayer.firstName.en = _.head(nameParts);
-                            if (!mongoPlayer.lastName.en)
-                                mongoPlayer.lastName.en = _.last(nameParts);
-                            mongoPlayer.markModified('firstName.en');
-                            mongoPlayer.markModified('lastName.en');
-                        }
                         const shortNameParts = _.split(player.short_name, ' ');
                         const inverseNameParts = _.concat(_.takeRight(shortNameParts, shortNameParts.length - 1), _.head(shortNameParts));
                         const nameEn = _.join(inverseNameParts, ' ');
-                        if (!mongoPlayer.name.en) {
-                            mongoPlayer.name.en = nameEn; //player.name;
-                            mongoPlayer.markModified('name.en');
+                        if (!mongoPlayer.shortName.en) {
+                            mongoPlayer.shortName.en = nameEn; //player.name;
+                            mongoPlayer.markModified('shortName.en');
                         }
-                        if (!mongoPlayer.name.ar && mongoPlayerSameId) {
-                            if (mongoPlayerSameId && mongoPlayerSameId.name && mongoPlayerSameId.name.ar) {
-                                mongoPlayer.name.ar = mongoPlayerSameId.name.ar;
-                                mongoPlayer.markModified('name.ar');
-                            }
-                            if (mongoPlayerSameId && mongoPlayerSameId.firstName && mongoPlayerSameId.firstName.ar) {
-                                mongoPlayer.firstName.ar = mongoPlayerSameId.firstName.ar;
-                                mongoPlayer.markModified('firstName.ar');
-                            }
-                            if (mongoPlayerSameId && mongoPlayerSameId.lastName && mongoPlayerSameId.lastName.ar) {
-                                mongoPlayer.lastName.ar = mongoPlayerSameId.lastName.ar;
-                                mongoPlayer.markModified('lastName.ar');
-                            }
-                        }
-
-                        /* ************************************************
-                        // One-off code to populate arabic names for WC2018
-                        if (mongoPlayer.name.en) {
-                            if (mongoPlayer.name.ar) {
-                                log.info(`${player.name} (short: ${player.short_name}) of team ${team.name} maintained its arabic name of ${mongoPlayer.name.ar}.`);
-                            } else {
-                                let arabicPlayerName = playerArNamesLookup[team.name + ':' + player.name];
-                                if (!arabicPlayerName)
-                                    arabicPlayerName = playerArNamesLookup[team.name + ':' + mongoPlayer.name.en];
-
-                                if (arabicPlayerName) {
-                                    mongoPlayer.name.ar = arabicPlayerName.PlayerNameAr;
-                                    mongoPlayer.markModified('name.ar');
-                                    log.info(`${player.name} (short: ${player.short_name}) of team ${team.name} updated its arabic name to ${mongoPlayer.name.ar}.`);
-                                }
-                                else {
-                                    log.warn(`\t Player ${player.name} (short: ${player.short_name}) of team ${team.name} was not found in arabic translations !`);
-                                }
-                            }
-                        }
-                        // End One-off code to populate arabic names for WC2018
-                        */ // ************************************************
 
                         if (!mongoPlayer.position)
-                            mongoPlayer.position = player.details.position_name == 'Attacker' ? 'Forward' : player.details.position_name;
-                        if (!mongoPlayer.personalData.height && player.details.height && player.details.height != '')
+                            mongoPlayer.position = player.details.position_name === 'Attacker' ? 'Forward' : player.details.position_name;
+                        if (!mongoPlayer.personalData.height && player.details.height && player.details.height !== '')
                             mongoPlayer.personalData.height = {
                                 centimeters: parseInt(player.details.height, 10)
                             };
-                        if (!mongoPlayer.personalData.weight && player.details.weight && player.details.weight != '')
+                        if (!mongoPlayer.personalData.weight && player.details.weight && player.details.weight !== '')
                             mongoPlayer.personalData.weight = {
                                 kilograms: parseInt(player.details.weight, 10)
                             };
@@ -940,9 +1042,9 @@ Parser.UpdateTeams = function (competitionId, callback) {
                                 },
                                 birthDate: {
                                     full: player.details.birthdate,
-                                    year: birthdateParts && birthdateParts.length == 3 ? parseInt(birthdateParts[0], 10) : null,
-                                    month: birthdateParts && birthdateParts.length == 3 ? parseInt(birthdateParts[1], 10) : null,
-                                    day: birthdateParts && birthdateParts.length == 3 ? parseInt(birthdateParts[2], 10) : null
+                                    year: birthdateParts && birthdateParts.length === 3 ? parseInt(birthdateParts[0], 10) : null,
+                                    month: birthdateParts && birthdateParts.length === 3 ? parseInt(birthdateParts[1], 10) : null,
+                                    day: birthdateParts && birthdateParts.length === 3 ? parseInt(birthdateParts[2], 10) : null
                                 }
                             };
                         if (!mongoPlayer.personalData.nationality)
@@ -951,28 +1053,20 @@ Parser.UpdateTeams = function (competitionId, callback) {
                                 abbreviation: player.area_code
                             };
                         mongoPlayer.markModified('personalData');
-                        if (mongoTeam)
-                            mongoPlayer.teamId = mongoTeam.id;
                         mongoPlayer.updated = creationDate;
 
                         playersToUpdate.push(mongoPlayer);
                     }
                     else {
-                        // Search for existing team with same id
-                        const mongoPlayer = _.find(mongoPlayersWithParserIds, { parserIdName: player.id }); 
 
-                        var newPlayer = new mongoDb.players();
-                        newPlayer._id = new objectId();
-                        const nameParts = _.split(player.name, ' ');
-                        if (nameParts.length > 1) {
-                            newPlayer.firstName = { "en": _.head(nameParts) };
-                            newPlayer.lastName = { "en": _.last(nameParts) };
-                        }
+                        var newPlayer = new mongoDb.trn_players();
+                        //newPlayer._id = new objectId();
                         const shortNameParts = _.split(player.short_name, ' ');
                         const inverseNameParts = _.concat(_.takeRight(shortNameParts, shortNameParts.length - 1), _.head(shortNameParts));
                         const nameEn = _.join(inverseNameParts, ' ');
 
-                        newPlayer.name = { 'en': nameEn }; //player.name };
+                        newPlayer.shortName = { 'en': nameEn };
+                        newPlayer.name = { en: player.name };
                         //newPlayer.uniformNumber = player.uniform;
                         newPlayer.position = player.details.position_name == 'Attacker' ? 'Forward' : player.details.position_name;
                         const birthdateParts = player.details.birthdate ? _.split(player.details.birthdate, '-') : null;
@@ -1004,273 +1098,67 @@ Parser.UpdateTeams = function (competitionId, callback) {
                         newPlayer.parserids = {};
                         newPlayer.parserids[Parser.Name] = player.id;
                         newPlayer.created = creationDate;
-
-                        if (mongoPlayer) {
-                            newPlayer.name = mongoPlayer.name;
-                            newPlayer.name.en = nameEn;
-                            newPlayer.personalData = mongoPlayer.personalData;
-                            newPlayer.firstName = mongoPlayer.firstName;
-                            newPlayer.lastName = mongoPlayer.lastName;
-                        }
-                        if (mongoTeam)
-                            newPlayer.teamId = mongoTeam.id;
-
-                        /* ************************************************
-                        // One-off code to populate arabic names for WC2018
-                        if (newPlayer.name.en && !newPlayer.name.ar) {
-                            let arabicPlayerName = playerArNamesLookup[team.name + ':' + player.name];
-                            if (!arabicPlayerName)
-                                arabicPlayerName = playerArNamesLookup[team.name + ':' + nameEn];
-
-                            if (arabicPlayerName) {
-                                newPlayer.name.ar = arabicPlayerName.PlayerNameAr;
-                                log.info(`${player.name} (short: ${player.short_name}) of team ${team.name} updated its arabic name to ${newPlayer.name.ar}.`);
-                            }
-                            else {
-                                log.warn(`\t Player ${player.name} (short: ${player.short_name}) of team ${team.name} was not found in arabic translations !`)
-                            }
-                        }
-                        // End One-off code to populate arabic names for WC2018
-                        */ //************************************************
-
                         newPlayer.updated = creationDate;
 
+                        mongoTeam.players.push(newPlayer);
                         playersToAdd.push(newPlayer);
                     }
+
+                    // Compute player stats and accordingly insert or update trn_playerstats
+                    //mongoPlayerStatsLookup 
+
                 });
+
+            // Detect and remove players that do not belong to the team anymore
+            playersToRemove = _.concat(playersToRemove, _.remove(mongoTeam.players, (p) => {
+                if (!p.parserids || !p.parserids[Parser.Name])
+                    return true;
+
+                if (!playerParserIdsToAddUpdate[p.parserids[Parser.Name]]) {
+                    playersToRemove.push(p);
+                    return true;
+                }
+                else
+                    return false;
+            }));
         });
 
         const parserTeamLookup = _.keyBy(parserTeams, 'id');
-        teamsToRemove = _.filter(mongoTeams, (team) => { return !parserTeamLookup[team.parserids[Parser.Name]]; });
-        teamsToRemove.forEach((team) => {
-            team.competitionid = null;
-            playersToRemove = playersToRemove.concat(_.filter(mongoPlayers, { teamId: team.id }));
-        });
-        playersToRemove.forEach((player) => {
-            player.teamId = null;
-        });
+        //teamsToRemove = _.filter(mongoTeams, (team) => { return !parserTeamLookup[team.parserids[Parser.Name]]; });
+        teamsToRemove = _.remove(mongoCompetition.teams, (t) => {
+            if (!t.parserids || !t.parserids[Parser.Name])
+                return true;
 
-        // Fill in with standings all teams to be updated and inserted
-        teamsToAdd.forEach((team) => {
-            const teamParserId = team.parserids[Parser.Name];
-            if (standingsLookup[teamParserId])
-                team.standing = TranslateTeamStanding(standingsLookup[teamParserId], team);
-        });
-        teamsToUpdate.forEach((team) => {
-            const teamParserId = team.parserids[Parser.Name];
-            if (standingsLookup[teamParserId]) {
-                team.standing = TranslateTeamStanding(standingsLookup[teamParserId], team);
-                team.markModified('standing');
-            }
-        });
-
-        // Fill in with recent form data of last 5 matches
-        teamsToAdd.forEach((team) => {
-            const teamStats = standingsLookup[team.parserids[Parser.Name]];
-            if (teamStats && teamStats.columns) {
-                const recentFormColumn = _.find(teamStats.columns, { id: 46 });
-                if (recentFormColumn)
-                    team.recentForm = TranslateRecentForm(recentFormColumn.value);
-            }
-        });
-        teamsToUpdate.forEach((team) => {
-            const teamStats = standingsLookup[team.parserids[Parser.Name]];
-            if (teamStats && teamStats.columns) {
-                const recentFormColumn = _.find(teamStats.columns, { id: 46 });
-                if (recentFormColumn)
-                    team.recentForm = TranslateRecentForm(recentFormColumn.value);
-            }
-        });
-
-        // Fill in with last and next match and stats so far for each team to be either updated or inserted
-        teamsToAdd.forEach((team) => {
-            const teamParserId = team.parserids[Parser.Name];
-            let teamMatches = _.filter(leagueMatches, (m) => {
-                return m.participants && m.participants.length == 2 && (m.participants[0].id == teamParserId || m.participants[1].id == teamParserId);
-            });
-            teamMatches = _.orderBy(teamMatches, (match) => {
-                return moment.utc(match.start_date);
-            });
-            const lastMatch = _.findLast(teamMatches, { status_type: 'finished' });
-            let nextMatch = null;
-            if (!lastMatch)
-                team.lastmatch = null;
-            else {
-                const lastMatchIndex = _.indexOf(teamMatches, lastMatch);
-                const lastMatchHome = _.find(lastMatch.participants, { counter: 1 });
-                const lastMatchAway = _.find(lastMatch.participants, { counter: 2 });
-                const lastMatchHomeMongoTeam = mongoTeamsLookup[lastMatchHome.id];
-                const lastMatchAwayMongoTeam = mongoTeamsLookup[lastMatchAway.id];
-                const lastMatchObj = {
-                    home: _.pick(lastMatchHomeMongoTeam, ['_id', 'name', 'logo']),
-                    away: _.pick(lastMatchAwayMongoTeam, ['_id', 'name', 'logo']),
-                    homescore: parseInt(_.find(lastMatchHome.results, { id: 2 }).value, 10),
-                    awayscore: parseInt(_.find(lastMatchAway.results, { id: 2 }).value, 10),
-                    eventdate: moment.utc(lastMatch.start_date).toDate()
-                };
-                team.lastmatch = lastMatchObj;
-
-                // next match
-                nextMatch = lastMatchIndex + 1 < teamMatches.length ? teamMatches[lastMatchIndex + 1] : null;
-            }
-
-            if (!nextMatch) 
-                nextMatch = _.find(teamMatches, { status_type: 'scheduled' });
-            if (nextMatch && nextMatch.status_type == 'scheduled') {
-                const nextMatchHome = _.find(nextMatch.participants, { counter: 1 });
-                const nextMatchAway = _.find(nextMatch.participants, { counter: 2 });
-                const nextMatchHomeMongoTeam = mongoTeamsLookup[nextMatchHome.id];
-                const nextMatchAwayMongoTeam = mongoTeamsLookup[nextMatchAway.id];
-                const nextMatchObj = {
-                    home: _.pick(nextMatchHomeMongoTeam, ['_id', 'name', 'logo']),
-                    away: _.pick(nextMatchAwayMongoTeam, ['_id', 'name', 'logo']),
-                    homescore: 0,
-                    awayscore: 0,
-                    eventdate: moment.utc(nextMatch.start_date).toDate()
-                };
-                team.nextmatch = nextMatchObj;
+            if (!parserTeamLookup[t.parserids[Parser.Name]]) {
+                teamsToRemove.push(t);
+                return true;
             }
             else
-                team.nextmatch = null;
-
-            // Fill in with stats from league matches all teams to be updated and inserted
-            team.stats = UpdateTeamStats(teamMatches, teamParserId);
+                return false;
         });
-        teamsToUpdate.forEach((team) => {
-            const teamParserId = team.parserids[Parser.Name];
-            let teamMatches = _.filter(leagueMatches, (m) => {
-                return m.participants && m.participants.length == 2 && (m.participants[0].id == teamParserId || m.participants[1].id == teamParserId);
-            });
-            teamMatches = _.orderBy(teamMatches, (match) => {
-                return moment.utc(match.start_date);
-            });
-            const lastMatch = _.findLast(teamMatches, { status_type: 'finished' });
-            let nextMatch = null;
-            if (!lastMatch) 
-                team.lastmatch = null;
-            else {
-                const lastMatchIndex = _.indexOf(teamMatches, lastMatch);
-                const lastMatchHome = _.find(lastMatch.participants, { counter: 1 });
-                const lastMatchAway = _.find(lastMatch.participants, { counter: 2 });
-                const lastMatchHomeMongoTeam = mongoTeamsLookup[lastMatchHome.id];
-                const lastMatchAwayMongoTeam = mongoTeamsLookup[lastMatchAway.id];
-                const lastMatchObj = {
-                    home: _.pick(lastMatchHomeMongoTeam, ['_id', 'name', 'logo']),
-                    away: _.pick(lastMatchAwayMongoTeam, ['_id', 'name', 'logo']),
-                    homescore: parseInt(_.find(lastMatchHome.results, { id: 2 }).value, 10),
-                    awayscore: parseInt(_.find(lastMatchAway.results, { id: 2 }).value, 10),
-                    eventdate: moment.utc(lastMatch.start_date).toDate()
-                };
-                team.lastmatch = lastMatchObj;
-
-                // next match
-                nextMatch = lastMatchIndex + 1 < teamMatches.length ? teamMatches[lastMatchIndex + 1] : null;
-            }
-            team.markModified('lastmatch');
-
-            if (!nextMatch)
-                nextMatch = _.find(teamMatches, { status_type: 'scheduled' });
-            if (nextMatch && nextMatch.status_type == 'scheduled') {
-                const nextMatchHome = _.find(nextMatch.participants, { counter: 1 });
-                const nextMatchAway = _.find(nextMatch.participants, { counter: 2 });
-                const nextMatchHomeMongoTeam = mongoTeamsLookup[nextMatchHome.id];
-                const nextMatchAwayMongoTeam = mongoTeamsLookup[nextMatchAway.id];
-                const nextMatchObj = {
-                    home: _.pick(nextMatchHomeMongoTeam, ['_id', 'name', 'logo']),
-                    away: _.pick(nextMatchAwayMongoTeam, ['_id', 'name', 'logo']),
-                    homescore: 0,
-                    awayscore: 0,
-                    eventdate: moment.utc(nextMatch.start_date).toDate()
-                };
-                team.nextmatch = nextMatchObj;
-            }
-            else
-                team.nextmatch = null;
-            team.markModified('nextmatch');
-
-            // Fill in with stats from league matches all teams to be updated and inserted
-            team.stats = UpdateTeamStats(teamMatches, teamParserId);
-            team.markModified('stats');
-        });
-
-        // Fill in with top scorers
-        if (topScorers) {
-            teamsToAdd.forEach((team) => {
-                const teamParserId = team.parserids[Parser.Name];
-                const topTeamScorer = _.find(topScorers, { subparticipant_id: teamParserId });
-                if (topTeamScorer && mongoPlayersLookup[topTeamScorer.id])
-                    team.topscorer = mongoPlayersLookup[topTeamScorer.id].id;
-            });
-            teamsToUpdate.forEach((team) => {
-                const teamParserId = team.parserids[Parser.Name];
-                const topTeamScorer = _.find(topScorers, { subparticipant_id: teamParserId });
-                if (topTeamScorer && mongoPlayersLookup[topTeamScorer.id])
-                    team.topscorer = mongoPlayersLookup[topTeamScorer.id].id;
-            });
-        }
-
-        // Detect and remove players that do not belong to any of the teams anymore
-        playersToRemove = _.filter(mongoPlayers, (p) => {
-            return !playerParserIdsToAddUpdate[p.parserids[Parser.Name]]
-        });
-        _.forEach(playersToRemove, (p) => { p.teamId = null; });
 
 
         // Now that we have all teams and players to be added or updated, do the appropriate MongoDB transactions and persist the documents
         async.parallel([
-            function (innerCallback) {
-                if (teamsToAdd && teamsToAdd.length > 0) {
-                    async.each(teamsToAdd, function (teamToAdd, cbk) {
-                        return teamToAdd.save(cbk);
-                    }, innerCallback);
-                }
-                else
-                    innerCallback(null);
+            (innerCallback) => mongoCompetition.save(innerCallback),
+            (innerCallback) => {
+                async.each(mongoCompetition.teams, (team, cbk) => {
+                    async.waterfall([
+                        (wcbk) => {
+                            async.each(team.players, (p, innCbk) => {
+                                p.save(innCbk);
+                            }, wcbk);
+                        },
+                        (wcbk) => {
+                            team.save(wcbk);
+                        }
+                    ], cbk);
+                }, innerCallback);
             },
-            function (innerCallback) {
-                if (teamsToUpdate && teamsToUpdate.length > 0) {
-                    async.each(teamsToUpdate, function (teamToUpdate, cbk) {
-                        return teamToUpdate.save(cbk);
-                    }, innerCallback);
-                }
-                else
-                    innerCallback(null);
-            },
-            function (innerCallback) {
-                if (teamsToRemove && teamsToRemove.length > 0) {
-                    async.each(teamsToRemove, function (teamToRemove, cbk) {
-                        return teamToRemove.save(cbk);
-                    }, innerCallback);
-                }
-                else
-                    innerCallback(null);
-            },
-            function (innerCallback) {
-                if (playersToAdd && playersToAdd.length > 0) {
-                    async.each(playersToAdd, function (playerToAdd, cbk) {
-                        return playerToAdd.save(cbk);
-                    }, innerCallback);
-                }
-                else
-                    innerCallback(null);
-            },
-            function (innerCallback) {
-                if (playersToUpdate && playersToUpdate.length > 0) {
-                    async.each(playersToUpdate, function (playerToUpdate, cbk) {
-                        return playerToUpdate.save(cbk);
-                    }, innerCallback);
-                }
-                else
-                    innerCallback(null);
-            },
-            function (innerCallback) {
-                if (playersToRemove && playersToRemove.length > 0) {
-                    async.each(playersToRemove, function (playerToRemove, cbk) {
-                        return playerToRemove.save(cbk);
-                    }, innerCallback);
-                }
-                else
-                    innerCallback(null);
+            (innerCallback) => {
+                async.eachLimit(mongoTeamStats, 100, (stat, cbk) => {
+                    stat.save(cbk);
+                }, innerCallback);
             }
         ], function (parallelError, parallelResults) {
             if (parallelError)
@@ -1282,7 +1170,7 @@ Parser.UpdateTeams = function (competitionId, callback) {
         });
 
     });
-}
+};
 
 
 
@@ -1308,7 +1196,7 @@ Parser.UpdateTeamAndPlayerMappings = function (competitionId, callback) {
 
 
         // Get all teams, and then collect all teamIds and query for the related players
-        mongoDb.teams.find({ competitionid: competitionId }, function (teamError, existingTeams) {
+        mongoDb.trn_teams.find({ competitionid: competitionId }, function (teamError, existingTeams) {
             if (teamError)
                 return callback(teamError);
 
@@ -1327,7 +1215,7 @@ Parser.UpdateTeamAndPlayerMappings = function (competitionId, callback) {
                     existingTeamNameLookup[team.name && team.name['en']] = team;
             });
 
-            mongoDb.players.find({ teamId: { '$in': existingTeamIds } }, function (playerError, existingPlayers) {
+            mongoDb.trn_players.find({ teamId: { '$in': existingTeamIds } }, function (playerError, existingPlayers) {
                 if (playerError)
                     return callback(playerError);
 
@@ -1486,12 +1374,12 @@ Parser.UpdateTeamAndPlayerMappings = function (competitionId, callback) {
                                 async.parallel([
                                     (cbk3) => {
                                         async.each(teamsToUpdate, function (teamToUpdate, cbk2) {
-                                            return mongoDb.teams.findOneAndUpdate({ _id: new objectId(teamToUpdate.id) }, { $set: { parserids: teamToUpdate.parserids } }, cbk2);
+                                            return mongoDb.trn_teams.findOneAndUpdate({ _id: new objectId(teamToUpdate.id) }, { $set: { parserids: teamToUpdate.parserids } }, cbk2);
                                         }, cbk3);
                                     },
                                     (cbk3) => {
                                         async.each(playersToUpdate, function (playerToUpdate, cbk2) {
-                                            return mongoDb.players.findOneAndUpdate({ _id: new objectId(playerToUpdate.id) }, { $set: { parserids: playerToUpdate.parserids } }, cbk2);
+                                            return mongoDb.trn_players.findOneAndUpdate({ _id: new objectId(playerToUpdate.id) }, { $set: { parserids: playerToUpdate.parserids } }, cbk2);
                                         }, cbk3);
                                     }], (parallelErr, parallelResults) => {
                                         if (parallelErr)
@@ -1551,7 +1439,7 @@ Parser.UpdateLeagueStandings = function (competitionDocument, leagueId, season, 
         function (competition, cbk) {
             var parserQuery = 'parserids.' + Parser.Name;
             Parser.FindMongoTeamsInCompetition(leagueId, (teamError, teams) => {
-            //mongoDb.teams.find().ne(parserQuery, null).where('competitionid', leagueId).exec(function (teamError, teams) {
+            //mongoDb.trn_teams.find().ne(parserQuery, null).where('competitionid', leagueId).exec(function (teamError, teams) {
                 if (teamError)
                     return cbk(teamError);
 
@@ -1787,7 +1675,7 @@ Parser.GetCompetitionFixtures = function (competitionId, seasonYear, outerCallba
         function (competition, callback) {
             let parserQuery = 'parserids.' + Parser.Name;
 
-            mongoDb.teams.find().ne(parserQuery, null).where('competitionid', competitionId).select('parserids competitionid logo name').exec(function (teamError, teams) {
+            mongoDb.trn_teams.find().ne(parserQuery, null).where('competitionid', competitionId).select('parserids competitionid logo name').exec(function (teamError, teams) {
                 if (teamError)
                     return callback(teamError);
 
@@ -1914,7 +1802,7 @@ Parser.UpdateTeamPlayersCareerStats = function (teamId, seasonYear, outerCallbac
 
     async.waterfall([
         function (callback) {
-            return mongoDb.teams.findById(teamId, callback);
+            return mongoDb.trn_teams.findById(teamId, callback);
         },
         function (teamObj, callback) {
             if (!teamObj || !teamObj.parserids || !teamObj.parserids[Parser.Name])
@@ -1936,7 +1824,7 @@ Parser.UpdateTeamPlayersCareerStats = function (teamId, seasonYear, outerCallbac
 
             competition = competitionObj;
 
-            mongoDb.players.find({ teamId: teamId, ['parserids.' + Parser.Name]: { $exists: true } }, function (error, data) {
+            mongoDb.trn_players.find({ teamId: teamId, ['parserids.' + Parser.Name]: { $exists: true } }, function (error, data) {
                 if (error)
                     return callback(error);
 
@@ -2234,7 +2122,7 @@ Parser.UpdateGuruStats = function (scheduledMatch, outerCallback) {
             });
         },
         function (callback) {
-            mongoDb.teams.findById(homeTeamId, 'parserids', function (teamError, team) {
+            mongoDb.trn_teams.findById(homeTeamId, 'parserids', function (teamError, team) {
                 if (teamError)
                     return callback(teamError);
 
@@ -2473,13 +2361,13 @@ Parser.UpdatePlayerNamesLocale = function (competitionId, locale, callback) {
     let teamLookup = {};
 
     return async.waterfall([
-        (cbk) => { return mongoDb.teams.find({ competitionid: competitionId }, '_id name', cbk); },
+        (cbk) => { return mongoDb.trn_teams.find({ competitionid: competitionId }, '_id name', cbk); },
         (teams, cbk) => {
 
             const teamIds = _.map(teams, 'id');
             allTeamIds = teamIds;
             teamLookup = _.keyBy(teams, 'id');
-            return mongoDb.players.find({ teamId: { $in: teamIds } }, '_id name firstName lastName teamId parserids', cbk);
+            return mongoDb.trn_players.find({ teamId: { $in: teamIds } }, '_id name firstName lastName teamId parserids', cbk);
         },
         (players, cbk) => {
 
@@ -2491,7 +2379,7 @@ Parser.UpdatePlayerNamesLocale = function (competitionId, locale, callback) {
             })));
             playerLookup = _.keyBy(players, (player) => { return player.parserids[Parser.Name]; });
 
-            return mongoDb.players.find({ ['parserids.' + Parser.Name]: { $in: parserIds, $exists: true }, teamId: {$nin: allTeamIds} }, '_id name firstName lastName teamId parserids', cbk);
+            return mongoDb.trn_players.find({ ['parserids.' + Parser.Name]: { $in: parserIds, $exists: true }, teamId: {$nin: allTeamIds} }, '_id name firstName lastName teamId parserids', cbk);
         },
         (similarPlayers, cbk) => {
 
