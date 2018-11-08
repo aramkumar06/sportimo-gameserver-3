@@ -17,7 +17,7 @@
  * **********************************************************************
  */
 
-"use strict"
+"use strict";
 
 var path = require('path'),
     fs = require('fs'),
@@ -78,56 +78,26 @@ var redisSubscribe = null;
 var tickSchedule = null;
 
 
-/************************************
- * Perform initialization functions */
-gamecards.connect = function (dbconnection, redisPublishChannel, redisSubscribeChannel) {
+
+/**
+ * Perform initialization functions
+ * @param {Object} dbconnection a mongoose connection object
+ * @param {Object} redisPublishChannel a redis publishing channel
+ * @param {Object} redisSubscribeChannel a redis subscription channel
+ */
+gamecards.connect = function (dbconnection, redisPublishChannel) {
     if (!db) {
         db = dbconnection;
-        UserGamecard = db.models.userGamecards;
+        UserGamecard = mongoose.models.trn_user_cards;
     }
 
     //if (!redisPublish)
     // Enforce re-registering the redisPublish object, to ensure proper initialization
     redisPublish = redisPublishChannel;
-
-    if (!redisSubscribe) {
-        redisSubscribe = redisSubscribeChannel;
-
-        if (redisSubscribe) {
-            redisSubscribe.on("error", function (err) {
-                log.error("{''Error'': ''" + err + "''}");
-            });
-
-            redisSubscribe.on("subscribe", function (channel, count) {
-                log.info("[Gamecards] Subscribed to Sportimo Events PUB/SUB channel");
-            });
-
-            redisSubscribe.on("unsubscribe", function (channel, count) {
-                log.info("[Gamecards] Unsubscribed from Sportimo Events PUB/SUB channel");
-            });
-
-            redisSubscribe.on("end", function () {
-                log.error("[Gamecards] Connection ended");
-            });
-
-            redisSubscribe.subscribe("socketServers");
-
-            redisSubscribe.on("message", function (channel, message) {
-                let msg = JSON.parse(message);
-                if (msg.payload && msg.payload.type && (msg.payload.type == 'socket_stats' || msg.payload.type == 'Stats_changed')) {
-                    // log.info("[Redis] : Event has come through the channel.");
-                    // log.info("[Redis] :" + JSON.stringify(msg.payload));
-
-                }
-            });
-        }
-    }
 };
 
-gamecards.init = function (dbconnection, redisPublishChannel, redisSubscribeChannel, match) {
-    gamecards.connect(dbconnection, redisPublishChannel, redisSubscribeChannel);
-
-    if (db == null || UserGamecard == null) {
+gamecards.init = function (match) {
+    if (db === null || UserGamecard === null) {
         log.error("No active database connection found. Aborting.");
         return new Error('No active database connection found. Aborting.');
     }
@@ -135,22 +105,22 @@ gamecards.init = function (dbconnection, redisPublishChannel, redisSubscribeChan
     if (!tickSchedule)
         tickSchedule = setInterval(gamecards.Tick, 3000);
 
-    // Check if match has gamecardDefinitions written in mongo from the gamecardTemplates and if their appearanceConditions are met, if not, create them.
+    // Check if match has trn_card_definitions written in mongo from the trn_card_templates and if their appearanceConditions are met, if not, create them.
     async.waterfall([
         function (callback) {
-            db.models.gamecardTemplates.find({ isActive: true }, function (error, templates) {
+            db.models.trn_card_templates.find({ isActive: true }, function (error, templates) {
                 if (error)
                     return callback(error);
                 callback(null, templates);
             });
         },
         function (templates, callback) {
-            db.models.gamecardDefinitions.find({ matchid: match._id.toString() }, function (error, definitions) {
+            db.models.trn_card_definitions.find({ matchid: match._id.toString() }, function (error, definitions) {
 
                 if (error)
                     return callback(error);
 
-                if (templates == null || templates.length == 0)
+                if (templates == null || templates.length === 0)
                     return callback(null);
                 //callback(null, definitions);
                 let usedTemplateIds = [];
@@ -161,7 +131,7 @@ gamecards.init = function (dbconnection, redisPublishChannel, redisSubscribeChan
 
                 // Now instantiate all not found templates into new gamecardDefinitions
                 _.forEach(templates, function (template) {
-                    if (_.indexOf(usedTemplateIds, template.id) == -1) {
+                    if (_.indexOf(usedTemplateIds, template.id) === -1) {
                         gamecards.createDefinitionFromTemplate(template, match);
                     }
                 });
@@ -186,11 +156,11 @@ gamecards.testAwardsHandling = function (callback) {
 }
 
 gamecards.getTemplates = function (callback) {
-    return db.models.gamecardTemplates.find({}, callback);
+    return db.models.trn_card_templates.find({}, callback);
 };
 
 gamecards.createMatchDefinitions = function (matchid, callback) {
-    // Check if match has gamecardDefinitions written in mongo from the gamecardTemplates and if their appearanceConditions are met, if not, create them.
+    // Check if match has trn_card_definitions written in mongo from the trn_card_templates and if their appearanceConditions are met, if not, create them.
     async.waterfall([
         function (callback) {
             var q = db.models.scheduled_matches.findById(matchid);
@@ -203,14 +173,14 @@ gamecards.createMatchDefinitions = function (matchid, callback) {
             });
         },
         function (match, callback) {
-            db.models.gamecardTemplates.find({}, function (error, templates) {
+            db.models.trn_card_templates.find({}, function (error, templates) {
                 if (error)
                     return callback(error);
                 callback(null, templates, match);
             });
         },
         function (templates, match, callback) {
-            db.models.gamecardDefinitions.find({ matchid: match._id }, function (error, definitions) {
+            db.models.trn_card_definitions.find({ matchid: match._id }, function (error, definitions) {
 
                 if (error)
                     return callback(error);
@@ -224,7 +194,7 @@ gamecards.createMatchDefinitions = function (matchid, callback) {
                         usedTemplateIds.push(definition.gamecardTemplateId);
                 });
 
-                // Now instantiate all not found templates into new gamecardDefinitions
+                // Now instantiate all not found templates into new trn_card_definitions
                 _.forEach(templates, function (template) {
                     if (_.indexOf(usedTemplateIds, template.id) == -1) {
                         gamecards.createDefinitionFromTemplate(template, match);
@@ -251,7 +221,7 @@ gamecards.upsertTemplate = function (template, callback) {
     let processedTemplate = null;
     try {
         if (template._id) {
-            db.models.gamecardTemplates.findByIdAndUpdate(template._id, template, { new: true }, function (err, result) {
+            db.models.trn_card_templates.findByIdAndUpdate(template._id, template, { new: true }, function (err, result) {
                 if (err)
                     return callback(err);
 
@@ -261,7 +231,7 @@ gamecards.upsertTemplate = function (template, callback) {
 
         }
         else {
-            processedTemplate = new db.models.gamecardTemplates(template);
+            processedTemplate = new db.models.trn_card_templates(template);
             processedTemplate.save(function (error, done) {
                 if (error)
                     return callback(error);
@@ -280,7 +250,7 @@ gamecards.upsertTemplate = function (template, callback) {
 };
 
 gamecards.removeTemplate = function (templateId, callback) {
-    db.models.gamecardTemplates.findByIdAndRemove(templateId, function (err, result) {
+    db.models.trn_card_templates.findByIdAndRemove(templateId, function (err, result) {
         if (!err) {
             return callback(err);
         } else {
@@ -295,7 +265,7 @@ gamecards.getDefinitions = function (state, callback) {
         state = 1; // get active ones
     }
 
-    db.models.gamecardDefinitions.find({ state: state, isVisible: true, isActive: true }, function (error, data) {
+    db.models.trn_card_definitions.find({ state: state, isVisible: true, isActive: true }, function (error, data) {
         if (error)
             return callback(error);
         callback(null, data);
@@ -305,7 +275,7 @@ gamecards.getDefinitions = function (state, callback) {
 // Added a new method because the old one returned only active ones and there was no sign of match id filtering
 gamecards.getMatchDefinitions = function (mid, callback) {
 
-    db.models.gamecardDefinitions.find({ matchid: mid }, function (error, data) {
+    db.models.trn_card_definitions.find({ matchid: mid }, function (error, data) {
         if (error)
             return callback(error);
         callback(null, data);
@@ -313,7 +283,7 @@ gamecards.getMatchDefinitions = function (mid, callback) {
 };
 
 gamecards.deleteMatchDefinition = function (gamecardId, callback) {
-    db.models.gamecardDefinitions.findByIdAndRemove(gamecardId, function (error, result) {
+    db.models.trn_card_definitions.findByIdAndRemove(gamecardId, function (error, result) {
         if (error)
             return callback(error);
 
@@ -324,7 +294,7 @@ gamecards.deleteMatchDefinition = function (gamecardId, callback) {
 // Aris: Added a new method to post new match definitions in order to proceed
 gamecards.addMatchDefinition = function (gamecard, callback) {
 
-    var newDef = new db.models.gamecardDefinitions({
+    var newDef = new db.models.trn_card_definitions({
         matchid: gamecard.matchid,
         text: gamecard.text,
         title: gamecard.title,
@@ -368,7 +338,7 @@ gamecards.addMatchDefinition = function (gamecard, callback) {
 // Aris: Added a new method to update match definitions in order to proceed
 gamecards.updateMatchDefinition = function (gamecard, callback) {
     if (gamecard._id) {
-        db.models.gamecardDefinitions.findByIdAndUpdate(gamecard._id, gamecard, function (err, result) {
+        db.models.trn_card_definitions.findByIdAndUpdate(gamecard._id, gamecard, function (err, result) {
             if (!err)
                 return callback(null, result);
             else
@@ -387,7 +357,7 @@ gamecards.upsertDefinition = function (gamecard, callback) {
             return callback(new Error('bad request: validation error in request body'));
 
         if (gamecard.id) {
-            processedDefinition = db.models.gamecardDefinitions.findById(gamecard.id);
+            processedDefinition = db.models.trn_card_definitions.findById(gamecard.id);
             processedDefinition.title = gamecard.title;
             processedDefinition.image = gamecard.image;
             processedDefinition.text = gamecard.text;
@@ -407,11 +377,11 @@ gamecards.upsertDefinition = function (gamecard, callback) {
             processedDefinition.cardType = gamecard.cardType;
         }
         else {
-            let existingDefinition = db.models.gamecardDefinitions.findById(gamecard._id);
+            let existingDefinition = db.models.trn_card_definitions.findById(gamecard._id);
             if (existingDefinition.state > 0)
                 return callback(new Error('bad request: cannot modify a gamecard definition that is not in the pending activation state'));
 
-            processedDefinition = new db.models.gamecardDefinitions({
+            processedDefinition = new db.models.trn_card_definitions({
                 matchid: gamecard.matchid,
                 text: gamecard.text,
                 title: gamecard.title,
@@ -485,7 +455,7 @@ gamecards.createDefinitionFromTemplate = function (template, match) {
         terminationTime = activationTime.add(300, 'seconds'); // set default termination time of 5 mins if for some reason the template lacks of a duration
 
 
-    let newDefinition = new db.models.gamecardDefinitions({
+    let newDefinition = new db.models.trn_card_definitions({
         matchid: match._id.toString(),
         gamecardTemplateId: template.id,
         creationTime: creationTime.toDate(),
@@ -641,7 +611,7 @@ gamecards.createDefinitionFromTemplate = function (template, match) {
 };
 
 
-// Select all gamecardDefinitions, and filter for those that have remainingUserInstances in their userGamecards counterparts null or > 0
+// Select all trn_card_definitions, and filter for those that have remainingUserInstances in their userGamecards counterparts null or > 0
 gamecards.getUserInstances = function (matchId, userId, cbk) {
     async.parallel([
         (callback) => {
@@ -660,10 +630,10 @@ gamecards.getUserInstances = function (matchId, userId, cbk) {
                 .exec(callback);
         },
         (callback) => {
-            return db.models.gamecardDefinitions.find({ matchid: matchId, isVisible: true, isActive: true, status: { $ne: 2 } }, callback);
+            return db.models.trn_card_definitions.find({ matchid: matchId, isVisible: true, isActive: true, status: { $ne: 2 } }, callback);
         },
         (callback) => {
-            return db.models.userGamecards.find({ matchid: matchId, userid: userId }, 'cardType status gamecardDefinitionId', callback);
+            return UserGamecard.find({ matchid: matchId, userid: userId }, 'cardType status gamecardDefinitionId', callback);
         }
     ], (asyncErr, asyncResult) => {
         if (asyncErr) {
@@ -779,7 +749,7 @@ gamecards.getUserInstances = function (matchId, userId, cbk) {
 * the userGamecard has to include a matchId to a scheduled_match instance
 * this scheduled_match instance should be existent and active
 * the userGamecard has to include a reference to a gamecard definition (wildcardDefinitionId)
-* this definition should be existing and active in the gamecardDefinitions collection
+* this definition should be existing and active in the trn_card_definitions collection
 * the userGamecard has to include the userid of the respective user
 * this user has to be existent and valid
 * the userGamecard has to include the creationTime (timestamp) of the actual time that the card has been played
@@ -824,7 +794,7 @@ gamecards.validateUserInstance = function (matchId, userGamecard, callback) {
             });
         },
         function (cbk) {
-            db.models.gamecardDefinitions.findById(userGamecard.gamecardDefinitionId, function (error, data) {
+            db.models.trn_card_definitions.findById(userGamecard.gamecardDefinitionId, function (error, data) {
                 if (error)
                     return cbk({ isValid: false, error: error.message });
 
@@ -857,7 +827,7 @@ gamecards.validateUserInstance = function (matchId, userGamecard, callback) {
             });
         },
         function (cbk) {
-            db.models.userGamecards.find({ matchid: matchId, userid: userGamecard.userid, gamecardDefinitionId: userGamecard.gamecardDefinitionId }, 'status cardType duration minute', function (error, sameDefinitionUsercards) {
+            UserGamecard.find({ matchid: matchId, userid: userGamecard.userid, gamecardDefinitionId: userGamecard.gamecardDefinitionId }, 'status cardType duration minute', function (error, sameDefinitionUsercards) {
                 if (error)
                     return cbk(error);
                 sameInstanceCount = !sameDefinitionUsercards ? 0 : sameDefinitionUsercards.length;
@@ -1124,7 +1094,7 @@ gamecards.updateUserInstance = function (userGamecardId, options, outerCallback)
     const itsNow = moment.utc();
     async.waterfall([
         function (callback) {
-            db.models.userGamecards.findById(userGamecardId, function (error, userGamecard) {
+            UserGamecard.findById(userGamecardId, function (error, userGamecard) {
                 if (error)
                     return callback(error);
 
@@ -1191,7 +1161,7 @@ gamecards.updateUserInstance = function (userGamecardId, options, outerCallback)
             if (validationError)
                 return callback(null, validationError, null, null);
 
-            db.models.userGamecards.find({ userid: userGamecard.userid, matchid: userGamecard.matchid, $or: [{ isDoublePoints: true }, { isDoubleTime: true }] }, 'isDoublePoints isDoubleTime', function (error, userGamecards) {
+            UserGamecard.find({ userid: userGamecard.userid, matchid: userGamecard.matchid, $or: [{ isDoublePoints: true }, { isDoubleTime: true }] }, 'isDoublePoints isDoubleTime', function (error, userGamecards) {
                 if (error)
                     return callback(error);
 
@@ -1278,7 +1248,7 @@ gamecards.updateUserInstance = function (userGamecardId, options, outerCallback)
             }
         }
         // userGamecard.save(function (err,result) {
-        db.models.userGamecards.findByIdAndUpdate(userGamecard._id, gamecards.TranslateUserGamecard(userGamecard), { new: true },
+        UserGamecard.findByIdAndUpdate(userGamecard._id, gamecards.TranslateUserGamecard(userGamecard), { new: true },
             function (err, result) {
                 if (err)
                     return outerCallback(err);
@@ -1397,11 +1367,11 @@ gamecards.Tick = function () {
         function (callback) {
             // Update all wildcards that are due for activation
             // ToDo: Check that the appearance criteria are also met
-            return db.models.gamecardDefinitions.update({ status: 0, activationTime: { $lt: itsNow } }, { $set: { status: 1 } }, { multi: true }, callback);
+            return db.models.trn_card_definitions.update({ status: 0, activationTime: { $lt: itsNow } }, { $set: { status: 1 } }, { multi: true }, callback);
         },
         function (callback) {
             // Update all special gamecards (power-ups) still in play that should be activated
-            db.models.userGamecards.find({ status: 1, $or: [{ 'specials.DoublePoints.status': 1, 'specials.DoublePoints.activationTime': { $lt: itsNow } }, { 'specials.DoubleTime.status': 1, 'specials.DoubleTime.activationTime': { $lt: itsNow } }] }, function (error, userGamecards) {
+            UserGamecard.find({ status: 1, $or: [{ 'specials.DoublePoints.status': 1, 'specials.DoublePoints.activationTime': { $lt: itsNow } }, { 'specials.DoubleTime.status': 1, 'specials.DoubleTime.activationTime': { $lt: itsNow } }] }, function (error, userGamecards) {
                 if (error)
                     return callback(error);
 
@@ -1445,7 +1415,7 @@ gamecards.Tick = function () {
         },
         function (callback) {
             // Update all user gamecards that have passed from their pending state into activation
-            return db.models.userGamecards.update({ status: 0, activationTime: { $lt: itsNow } }, { $set: { status: 1 } }, { multi: true }, callback);
+            return UserGamecard.update({ status: 0, activationTime: { $lt: itsNow } }, { $set: { status: 1 } }, { multi: true }, callback);
         },
         function (callback) {
             // Find all instant gameCards that terminate, and decide if they have won or lost
@@ -1459,7 +1429,7 @@ gamecards.Tick = function () {
             };
 
 
-            db.models.userGamecards.find(cardsQuery, function (error, data) {
+            UserGamecard.find(cardsQuery, function (error, data) {
                 if (error)
                     return callback(error);
 
@@ -1578,7 +1548,7 @@ gamecards.Tick = function () {
                         //     }, 200);
                         // },
                         function (parallelCbk) {
-                            db.models.userGamecards.find({ matchid: match.id, status: 0, cardType: 'PresetInstant', minute: { $lte: match.time }, segment: { $lte: match.state } }, function (error, userGamecards) {
+                            UserGamecard.find({ matchid: match.id, status: 0, cardType: 'PresetInstant', minute: { $lte: match.time }, segment: { $lte: match.state } }, function (error, userGamecards) {
                                 if (userGamecards.length > 0)
                                     console.log("Preset Found");
 
@@ -1617,7 +1587,7 @@ gamecards.Tick = function () {
                         function (parallelCbk) {
                             var systemTime = itsNow.toDate();
                             if (match.state == 2 || match.state == 4) {
-                                db.models.userGamecards.update({ matchid: match.id, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
+                                UserGamecard.update({ matchid: match.id, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
                                     if (error) {
                                         log.error('Failed to pause user gamecards after segment ' + (match.state - 1) + ' ends on match id %s !!!', match.id);
                                         return parallelCbk(null);
@@ -1651,7 +1621,7 @@ gamecards.Tick = function () {
                             wildcardsQuery.terminationConditions = { $elemMatch: { $and: [{ stat: event.stat }, { remaining: { $ne: 0 } }, { $or: orPlayerQuery }, { $or: orTeamQuery }] } };
                             let mongoGamecards;
 
-                            db.models.userGamecards.find(wildcardsQuery, function (error, data) {
+                            UserGamecard.find(wildcardsQuery, function (error, data) {
                                 if (error) {
                                     log.error("Error while resolving event: " + error.message);
                                     return parallelCbk(error);
@@ -1685,7 +1655,7 @@ gamecards.Tick = function () {
                             wildcardsQuery.terminationConditions = { $elemMatch: { $and: [{ stat: segment.stat }, { remaining: { $ne: 0 } }, { $or: orPlayerQuery }, { $or: orTeamQuery }] } };
                             let mongoGamecards;
 
-                            db.models.userGamecards.find(wildcardsQuery, function (error, data) {
+                            UserGamecard.find(wildcardsQuery, function (error, data) {
                                 if (error) {
                                     log.error("Error while resolving event: " + error.message);
                                     return parallelCbk(error);
@@ -2234,7 +2204,7 @@ gamecards.GamecardsAppearanceHandle = function (event, match) {
     // TODO: --> Ask: Why are we narrowing again?
     // gamecardsQuery.appearConditions = { $elemMatch: { $and: [{ stat: event.stat }, { remaining: { $ne: 0 } }, { $or: orPlayerQuery }, { $or: orTeamQuery }] } };
 
-    db.models.gamecardDefinitions.find(gamecardsQuery, function (error, mongoGamecards) {
+    db.models.trn_card_definitions.find(gamecardsQuery, function (error, mongoGamecards) {
         if (error) {
             log.error("Error while resolving event: " + error.message);
             return error;
@@ -2271,7 +2241,7 @@ gamecards.GamecardsAppearanceHandle = function (event, match) {
                 // switch the current visibility state
                 console.log("Found gamecard [" + gamecard.title.en + "] requiring change in visiblity and changed it to: " + AppearConditionsPassed)
                 gamecard.isVisible = AppearConditionsPassed;
-                db.models.gamecardDefinitions.findByIdAndUpdate(gamecard._id, { appearConditions: gamecard.appearConditions, isVisible: AppearConditionsPassed }, { new: true }, function (err, result) {
+                db.models.trn_card_definitions.findByIdAndUpdate(gamecard._id, { appearConditions: gamecard.appearConditions, isVisible: AppearConditionsPassed }, { new: true }, function (err, result) {
                     if (err)
                         return cbk(err);
                     cbk();
@@ -2312,12 +2282,12 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
     if (!matchId || !segmentIndex || _.indexOf([2, 4, 3, 5], segmentIndex) == -1)
         return;
 
-    // First half or second half or overtime ends. Pending userGamecards (status = 0) should be switched to paused (status = 3) and resume as activated after the pause
+    // First half or second half or overtime ends. Pending trn_user_cards (status = 0) should be switched to paused (status = 3) and resume as activated after the pause
     var systemTime = itsNow.toDate();
     if (segmentIndex == 2 || segmentIndex == 4) {
-        // db.models.userGamecards.update({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: { $in: [0, 1] } }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
+        // UserGamecard.update({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: { $in: [0, 1] } }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
         // Removed update to status 0 cards in order to fix the issue where presetCards would not activate
-        db.models.userGamecards.update({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
+        UserGamecard.update({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
             if (error) {
                 log.error('Failed to pause user gamecards after segment ' + (segmentIndex - 1) + ' ends on match id %s !!!', matchId);
                 return error;
@@ -2327,7 +2297,7 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
     else
         // Second half or Overtime starts
         if (segmentIndex == 3 || segmentIndex == 5) {
-            db.models.userGamecards.find({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 3 }, function (error, userGamecards) {
+            UserGamecard.find({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 3 }, function (error, userGamecards) {
                 if (error) {
                     log.error('Failed to resume paused cards after segment ' + segmentIndex + ' starts again on match id %s !!!', matchId);
                     return error;
@@ -2357,7 +2327,7 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
                             }
                         }));
 
-                        return db.models.userGamecards.update({ _id: userGamecard._id }, { $set: { status: userGamecard.status, resumeTime: userGamecard.resumeTime, terminationTime: userGamecard.terminationTime } }, callback);
+                        return UserGamecard.update({ _id: userGamecard._id }, { $set: { status: userGamecard.status, resumeTime: userGamecard.resumeTime, terminationTime: userGamecard.terminationTime } }, callback);
                     }
                     else {
                         async.setImmediate(function () {
@@ -2469,7 +2439,7 @@ gamecards.ResolveEvent = function (matchEvent) {
                 return;
             }
 
-            // Check for winConditions met in userGamecards
+            // Check for winConditions met in trn_user_cards
             async.each(individualEvents, function (event, callback) {
                 try {
                     const gamecardsQuery = {
@@ -2493,7 +2463,7 @@ gamecards.ResolveEvent = function (matchEvent) {
 
                     gamecardsQuery.winConditions = { $elemMatch: { $and: [{ stat: event.stat }, { remaining: { $ne: 0 } }, { $or: orPlayerQuery }, { $or: orTeamQuery }] } };
                     let mongoGamecards;
-                    db.models.userGamecards.find(gamecardsQuery, function (error, data) {
+                    UserGamecard.find(gamecardsQuery, function (error, data) {
                         if (error) {
                             log.error("Error while resolving event: " + error.message);
                             return callback(error);
@@ -2531,7 +2501,7 @@ gamecards.ResolveEvent = function (matchEvent) {
                                 wildcardsQuery.terminationConditions = { $elemMatch: { $and: [{ stat: event.stat }, { remaining: { $ne: 0 } }, { $or: orPlayerQuery }, { $or: orTeamQuery }] } };
                                 let mongoGamecards;
 
-                                db.models.userGamecards.find(wildcardsQuery, function (error, data) {
+                                UserGamecard.find(wildcardsQuery, function (error, data) {
                                     if (error) {
                                         log.error("Error while resolving event: " + error.message);
                                         return callback(error);
@@ -2718,10 +2688,10 @@ gamecards.ReEvaluateAll = function (matchId, outerCallback) {
                 .exec(callback);
         },
         (callback) => {
-            return db.models.gamecardDefinitions.find({ matchid: matchId }, callback);
+            return db.models.trn_card_definitions.find({ matchid: matchId }, callback);
         },
         (callback) => {
-            return db.models.userGamecards.find({ matchid: matchId }, callback);
+            return UserGamecard.find({ matchid: matchId }, callback);
         },
         (callback) => {
             return db.models.scores.find({ game_id: matchId }, callback);
@@ -2743,7 +2713,7 @@ gamecards.ReEvaluateAll = function (matchId, outerCallback) {
         const home_team_id = match.home_team.id;
         const away_team_id = match.away_team.id;
 
-        // Reset userGamecards
+        // Reset trn_user_cards
         // Reset user stats ?
 
         // Reset match stats
@@ -3114,7 +3084,7 @@ gamecards.TerminateMatch = function (match, callback) {
         matchid: match.id
     };
     var cardsCount;
-    db.models.userGamecards.find(gamecardsQuery, function (error, mongoGamecards) {
+    UserGamecard.find(gamecardsQuery, function (error, mongoGamecards) {
         if (error) {
             log.error("Error while resolving event: " + error.message);
             if (callback)
@@ -3180,7 +3150,7 @@ gamecards.TerminateMatch = function (match, callback) {
 var app = null;
 
 try {
-    app = require('./../../server');
+    app = require('./../../server').server;
     module.exports = this;
 } catch (ex) {
     // Start server
@@ -3189,18 +3159,18 @@ try {
     app.listen(port, function () {
         console.log('Express server listening on port %d in %s mode', port, app.get('env'));
     });
-}
 
-app.use(function (req, res, next) {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, X-Access-Token");
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
-    next();
-});
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
-    extended: true
-}));
+    app.use(function (req, res, next) {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, X-Access-Token");
+        res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+        next();
+    });
+    app.use(bodyParser.json());
+    app.use(bodyParser.urlencoded({
+        extended: true
+    }));
+}
 
 // Loading gamecard API routes
 var apiPath = path.join(__dirname, 'api');

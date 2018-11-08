@@ -14,11 +14,11 @@ var moment = require('moment'),
     _ = require('lodash'),
     mongoConnection = require('../config/db.js'),
     matchEvents = require('../../models/matchEvents'),
-    matches = require('../../models/scheduled-matches'),
-    useractivities = require('../../models/userActivity'),
+    matches = require('../../models/match'),
+    useractivities = require('../../models/trn_user_activity'),
     serversettings = require('../../models/gameServerSettings'),
-    userGamecards = require('../../models/userGamecard'),
-    scores = require('../../models/score'),
+    userGamecards = require('../../models/trn_user_card'),
+    scores = require('../../models/trn_score'),
     users = require('../../models/user'),
     //mongoose = require('mongoose'),
     async = require('async'),
@@ -67,7 +67,7 @@ fs.readdirSync(servicesPath).forEach(function (file) {
 });
 
 
-var matchModule = function (match, PubChannel, SubChannel, shouldInitAutoFeed) {
+var matchModule = function (match, shouldInitAutoFeed) {
 
     var HookedMatch = {}; // = match;
 
@@ -129,7 +129,7 @@ var matchModule = function (match, PubChannel, SubChannel, shouldInitAutoFeed) {
 
     // establishing a link with gamecards module, where match events should propagate in order to resolve played match wildcards
     HookedMatch.gamecards = require('../../gamecards');
-    HookedMatch.gamecards.init(mongoConnection.mongoose, PubChannel, SubChannel, match);
+    HookedMatch.gamecards.init(match);
     var queueIndex = 0;
     var eventReceiptFromCreationTimeoutSeconds = 10;
     HookedMatch.queue = async.queue(function (matchEvent, callback) {
@@ -588,7 +588,7 @@ var matchModule = function (match, PubChannel, SubChannel, shouldInitAutoFeed) {
             // Resetting lastEventTime, to be able to accept events right after the start of the Segment
             HookedMatch.lastEventTime = 0;
 
-            if (thisMatch.state == 0) {
+            if (thisMatch.state === 0) {
                 if (HookedMatch.data.settings.sendPushes == undefined || HookedMatch.data.settings.sendPushes) {
                     async.parallel([
                         (cbk) => {
@@ -660,8 +660,8 @@ var matchModule = function (match, PubChannel, SubChannel, shouldInitAutoFeed) {
 
                 }
             }
-            else if (thisMatch.state == 1) {
-                if (HookedMatch.data.settings.sendPushes == undefined || HookedMatch.data.settings.sendPushes) {
+            else if (thisMatch.state === 1) {
+                if (HookedMatch.data.settings.sendPushes === undefined || HookedMatch.data.settings.sendPushes) {
                     async.parallel([
                         (cbk) => {
                             useractivities.find({ room: HookedMatch.id })

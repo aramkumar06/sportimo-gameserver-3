@@ -59,7 +59,9 @@ var match_module = require('./lib/match-module.js');
 /*Bootstrap models*/
 var team = null,
     scheduled_matches = null,
-    matches = mongoose.models.scheduled_matches,
+    matches = require('../models/match'),
+    tournaments = require('../models/tournament'),
+    tournamentMatches = require('../models/trn_match'),
     feedstatuses = mongoose.models.matchfeedStatuses,
     users = mongoose.models.users;
 
@@ -91,10 +93,10 @@ var ModerationModule = {
     //         return timer;
     //     }
     // },
+    ModeratedTournamentMatches: [],
     ModeratedMatches: [],
 
     testing: false,
-    callback: null,
     mongoose: null,
     mock: false,
     count: function () {
@@ -228,7 +230,7 @@ var ModerationModule = {
                 feedstatuses.find({ matchid: matchid }).remove().exec(function (err, opResult) {
                     cbk(opResult);
                 });
-            })
+            });
         });
     },
     ToggleMatchComplete: function (matchid, cbk) {
@@ -241,7 +243,7 @@ var ModerationModule = {
                 // feedstatuses.find({ matchid: matchid }).remove().exec(function (err, opResult) {
                 //     cbk(opResult);
                 // });
-            })
+            });
         });
     },
     ReleaseMatch: function (matchid, cbk) {
@@ -252,23 +254,21 @@ var ModerationModule = {
     LoadMatchFromDB: function (matchid, cbk) {
 
         if (!this.mock) {
-            scheduled_matches
+            tournamentMatches
                 .findOne({
                     _id: matchid
                 })
-                .populate('home_team')
-                .populate('away_team')
-                .populate('competition')
-                .exec(function (err, match) {
+                .populate({ path: 'match', populate: [{ path: 'home_team' }, { path: 'away_team' }, { path: 'competition' }] })
+                .exec(function (err, tournamentMatch) {
                     if (err)
                         return cbk(err);
 
-                    if (!match) {
+                    if (!tournamentMatch) {
                         log.info(ModerationModule.count);
                         if (cbk)
                             return cbk("No match with this ID could be found in the database. There must be a match in the database already in order for it to be transfered to the Active matches", null);
                         else
-                            return (null);
+                            return null;
                     }
 
                     var foundMatch = _.find(ModerationModule.ModeratedMatches, { id: match.id });
@@ -285,7 +285,7 @@ var ModerationModule = {
                             // Release to GC
                             foundMatch = null;
 
-                            var hookedMatch = new match_module(match, RedisClientPub, RedisClientSub, shouldInitAutoFeed);
+                            var hookedMatch = new match_module(match, shouldInitAutoFeed);
 
                             ModerationModule.ModeratedMatches.push(hookedMatch);
                             log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Hooking on it.");
@@ -297,7 +297,7 @@ var ModerationModule = {
                         });
                     }
                     else {
-                        var hookedMatch = new match_module(match, RedisClientPub, RedisClientSub, shouldInitAutoFeed);
+                        var hookedMatch = new match_module(match, shouldInitAutoFeed);
 
                         ModerationModule.ModeratedMatches.push(hookedMatch);
                         log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Hooking on it.");
@@ -309,8 +309,8 @@ var ModerationModule = {
                     }
                 });
         } else {
-            var match = new scheduled_matches(mockMatch);
-            var hookedMatch = new match_module(match, RedisClientPub);
+            var trnMatch = new tournamentMatches(mockMatch);
+            var hookedMatch = new match_module(trnMatch);
             ModerationModule.ModeratedMatches.push(hookedMatch);
             log.info("Found match with ID [" + hookedMatch.id + "]. Hooking on it.");
 
@@ -335,18 +335,18 @@ var ModerationModule = {
 };
 
 ModerationModule.GetSchedule = function (cbk) {
-    scheduled_matches
-        .find({})
-        .populate('home_team')
-        .populate('away_team')
-        .populate('competition')
-        .exec(function (err, schedule) {
+    tournamentMatches
+        .findOne({
+            _id: matchid
+        })
+        .populate({ path: 'match', populate: [{ path: 'home_team' }, { path: 'away_team' }, { path: 'competition' }] })
+        .exec(function (err, match) {
             if (err) {
                 log.error(err);
                 return cbk(err);
             }
 
-            cbk(null, schedule);
+            cbk(null, match);
         });
 };
 
@@ -356,25 +356,51 @@ ModerationModule.GetSchedule = function (cbk) {
 
 var objectAssign = require('object-assign');
 
-ModerationModule.AddScheduleMatch = function (match, cbk) {
+ModerationModule.AddScheduleMatch = function (match, tournamentId, cbk) {
     var matchTemplate = require('./mocks/empty-match');
 
     matchTemplate = objectAssign(matchTemplate, match);
 
-    var newMatch = new scheduled_matches(matchTemplate);
-
-
-    newMatch.save(function (er, saved) {
-
-        if (er)
-            return cbk(er);
-        ModerationModule.LoadMatchFromDB(saved._id, function (err, match) {
-            if (err)
+    tournaments.findOne({ _id: tournamentId }).populate('client').exec((err, tournament) => {
+        if (err) {
+            if (cbk)
                 return cbk(err);
+            return err.message;
+        }
 
-            cbk(null, match);
+        if (!tournament) {
+            const errMsg = `Add tournament match: Not found tournament id ${tournamentId}`;
+            if (cbk)
+                return cbk(new Error(errMsg));
+            return errMsg;
+        }
+
+
+        var newMatch = new matches(matchTemplate);
+        var tournamentMatch = new tournamentMatches();
+        tournamentMatch.match = newMatch;
+        tournamentMatch.client = tournament.client;
+        tournamentMatch.tournament = tournament;
+
+        async.parallel([
+            (icbk) => tournamentMatch.save(icbk),
+            (icbk) => newMatch.save(icbk)
+        ], function (er, saveResults) {
+
+            if (er) {
+                if (cbk)
+                    return cbk(er);
+                return er.message;
+            }
+
+            ModerationModule.LoadMatchFromDB(saveResults[0]._id, function (err, match) {
+                if (err)
+                    return cbk(err);
+
+                cbk(null, match);
+            });
+
         });
-
     });
 };
 
@@ -410,7 +436,7 @@ ModerationModule.RemoveScheduleMatch = function (id, cbk) {
  */
 ModerationModule.updateMatchcronJobsInfo = function () {
     var itsNow = moment.utc();
-    scheduled_matches
+    matches
         .find({
             state: { $gt: -1 },
             completed: { $ne: true },
@@ -462,12 +488,12 @@ ModerationModule.matchStartWatcher = function () {
     try {
         var now = moment.utc();
         var fifteenMinsAfterNow = now.clone().add(16, 'm').toDate();
-        scheduled_matches
+        matches
             .find({
                 state: { $gt: -1 },
                 completed: { $ne: true },
                 disabled: { $ne: true },
-                start: { $lte: fifteenMinsAfterNow, $gt: now.toDate() },
+                start: { $lte: fifteenMinsAfterNow, $gt: now.toDate() }
             }, '_id start home_team away_team')
             .populate('_id home_team away_team', 'name')
             .exec(function (err, matches) {
@@ -492,7 +518,7 @@ ModerationModule.matchStartWatcher = function () {
 
                         var allUserIds = _.map(allUsers, 'id');
 
-                        if (matchesStartingInNext15.length == 0)
+                        if (matchesStartingInNext15.length === 0)
                             return async.setImmediate(() => { cbk(null, allUserIds); });
                         else {
                             // We have at least a match starting in the next 5 mins
@@ -505,7 +531,7 @@ ModerationModule.matchStartWatcher = function () {
 
                                     // Find the last 5, 10 and 20 matches
 
-                                    return scheduled_matches
+                                    return matches
                                         .find({
                                             completed: true,
                                             start: { $lt: now }
@@ -729,43 +755,53 @@ ModerationModule.matchStartWatcher = function () {
     }
 }
 
-function initModule(done) {
+function initModule(callback) {
     if (!this.mock) {
         /* We load all scheduled/active matches from DB on server initialization */
-        scheduled_matches
-            .find({
-                state: { $gt: -1 },
-                completed: { $ne: true }
-            })
-            .populate('home_team')
-            .populate('away_team')
-            .populate('competition')
-            .exec(function (err, matches) {
-                if (err)
-                    return ModerationModule.callback ? ModerationModule.callback(err) : log.error(err);
-                if (matches) {
 
-                    // Adding wait index of 1sec in order to bypass the limitation of STATS that prevents overload of calls
-                    var waitIndex = 0;
+        async.waterfall([
+            (cbk) => {
+                matches
+                    .find({
+                        state: { $gt: -1 },
+                        completed: { $ne: true }
+                    })
+                    .select('_id')
+                    .exec(cbk);
+            },
+            (matches, cbk) => {
+                const matchObjectIds = _.map(matches, '_id');
+                tournamentMatches
+                    .find({ match: { $in: matchObjectIds } })
+                    .populate({ path: 'match', populate: [{ path: 'home_team' }, { path: 'away_team' }, { path: 'competition' }] })
+                    .exec(cbk);
+            }
+        ], function (err, trnMatches) {
+            if (err)
+                return callback ? callback(err) : log.error(err);
 
-                    /*For each match found we hook platform specific functionality and add it to the main list*/
-                    _.forEach(matches, function (match) {
-                        setTimeout(function () {
-                            var hookedMatch = new match_module(match, RedisClientPub, RedisClientSub, shouldInitAutoFeed);
-                            ModerationModule.ModeratedMatches.push(hookedMatch);
-                            log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Creating match instance");
-                        }, 2000 * waitIndex);
-                        waitIndex++;
-                    });
-                } else {
-                    log.warn("No scheduled matches could be found in the database.");
-                }
+            if (trnMatches) {
 
-                // Callback we are done for whomever needs it
-                if (ModerationModule.callback != null)
-                    ModerationModule.callback();
+                // Adding wait index of 1sec in order to bypass the limitation of STATS that prevents overload of calls
+                var waitIndex = 0;
 
-            });
+                /*For each match found we hook platform specific functionality and add it to the main list*/
+                _.forEach(trnMatches, function (tmatch) {
+                    setTimeout(function () {
+                        var hookedMatch = new match_module(tmatch.match, shouldInitAutoFeed);
+                        ModerationModule.ModeratedMatches.push(hookedMatch);
+                        log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Creating match instance");
+                    }, 2000 * waitIndex);
+                    waitIndex++;
+                });
+            } else {
+                log.warn("No scheduled matches could be found in the database.");
+            }
+
+            // Callback we are done for whomever needs it
+            if (callback !== null)
+                callback();
+        });
 
 
     } else {
@@ -773,13 +809,13 @@ function initModule(done) {
 
         var match = new scheduled_matches(mockMatch);
 
-        var hookedMatch = new match_module(match, RedisClientPub, RedisClientSub);
+        var hookedMatch = new match_module(match);
         this.ModeratedMatches.push(hookedMatch);
         log.info("Mock match created with ID [" + hookedMatch.id + "].");
 
         // Callback we are done for whomever needs it
-        if (ModerationModule.callback != null)
-            ModerationModule.callback();
+        if (callback != null)
+            callback();
     }
 
     // Here we will create a job in interval where we check for feed matches, if theit timers are set and update accordingly the time until initiation

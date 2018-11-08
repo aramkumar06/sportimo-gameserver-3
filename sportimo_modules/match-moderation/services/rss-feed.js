@@ -22,7 +22,7 @@ var path = require('path'),
     winston = require('winston'),
     _ = require('lodash'),
     async = require('async');
-
+var ObjectId = mongoose.Schema.Types.ObjectId;
 
 var log = new (winston.Logger)({
     levels: {
@@ -189,7 +189,7 @@ feedService.prototype.emitStats = function (matchid, stats) {
 
 // Manage match segment advances, simple proxy to match module
 feedService.prototype.AdvanceMatchSegment = function (state) {
-    if (this.active == false)
+    if (this.active === false)
         return;
 
     feedService.prototype.queueCount++;
@@ -238,11 +238,16 @@ feedService.prototype.Terminate = function (callback) {
 };
 
 // Helper function that loads a team players from the mongoDb store
-feedService.prototype.LoadPlayers = function (teamId, callback) {
+feedService.prototype.LoadPlayers = function (teamObjectId, callback) {
     if (!mongoose)
         return callback(null);
     try {
-        return mongoose.mongoose.models.players.find({ teamId: teamId }, callback);
+        return mongoose.mongoose.models.trn_teams.find({ _id: teamObjectId }).populate('players').exec((err, team) => {
+            if (err) {
+                return callback(err);
+            }
+            return callback(null, team.players);
+        });
     }
     catch (error) {
         log.error("Error while loading players from Mongo: %s", error.message);
@@ -251,31 +256,6 @@ feedService.prototype.LoadPlayers = function (teamId, callback) {
 };
 
 
-feedService.prototype.LoadTeam = function (teamId, callback) {
-    if (!mongoose)
-        return callback(null);
-    try {
-        return mongoose.mongoose.models.teams.findById(teamId, callback);
-    }
-    catch (error) {
-        log.error("Error while loading team from Mongo: %s", error.message);
-        return callback(error);
-    }
-};
-
-
-feedService.prototype.LoadCompetition = function (competitionId, callback) {
-    if (!mongoose)
-        return callback(null);
-
-    try {
-        return mongoose.mongoose.models.competitions.findById(competitionId, callback);
-    }
-    catch (error) {
-        log.error("Error while loading competition from Mongo: %s", error.message);
-        return callback(error);
-    }
-};
 
 feedService.prototype.SaveParsedEvents = function (parserName, matchId, eventIds, diffedEvents, allEvents, incompleteEvents, parserStatus) {
     if (!mongoose)
@@ -372,7 +352,7 @@ feedService.prototype.LoadMatchEvents = function (parserName, matchId, callback)
         return;
 
     try {
-        mongoose.mongoose.models.scheduled_matches.findById(matchId, 'timeline', (mongoErr, match) => {
+        mongoose.mongoose.models.matches.findById(matchId, 'timeline', (mongoErr, match) => {
             if (mongoErr) {
                 log.error(`Error while loading parser eventIds from match id ${matchId} Mongo: \n${mongoErr.stack}`);
                 return callback(error);
@@ -390,7 +370,7 @@ feedService.prototype.LoadMatchEvents = function (parserName, matchId, callback)
         log.error(`Error while loading parser eventIds from match id ${matchId} Mongo: ${error.message}`);
         return callback(error);
     }
-}
+};
 
 feedService.prototype.LoadAllEventsStream = function (parserName, matchId, stepNo, callback) {
     if (!mongoose)

@@ -392,6 +392,8 @@ function Parser(matchContext, feedServiceContext) {
     this.matchHandler = matchContext;
     this.feedService = feedServiceContext;
     this.scheduledTask = null;
+    // the parser upon initialization will inquire about the competition mappings
+    this.league = matchContext.competition;
 
     this.allEventsQueue = [];
     this.sportimoEventIdsQueue = [];
@@ -416,8 +418,6 @@ function Parser(matchContext, feedServiceContext) {
     if (this.feedService.active !== 'undefined' && this.feedService.active != null)
         this.isPaused = !this.feedService.active;
 
-    // the parser upon initialization will inquire about the competition mappings
-    this.league = null;
 
     this.status = {
         //homeTeamGoalEvents: [],
@@ -445,32 +445,22 @@ Parser.prototype.init = function (cbk) {
     var startDate = null;
     let isBooked = false;
 
+    // Make a lookup for the home team
+    let homeTeam = this.matchHandler.home_team;
+    homeTeam['matchType'] = 'home_team';
+    if (!homeTeam.parserids)
+        return callback(new Error("No parserids[" + this.Name + "]  property in team id " + homeTeam.id + " document in Mongo. Aborting."));
+    this.matchTeamsLookup[homeTeam.parserids[that.Name]] = homeTeam;
+
+    // Make a lookup for the home team
+    let awayTeam = this.matchHandler.away_team;
+    awayTeam['matchType'] = 'away_team';
+    if (!awayTeam.parserids)
+        return callback(new Error("No parserids[" + this.Name + "]  property in team id " + awayTeam.id + " document in Mongo. Aborting."));
+    this.matchTeamsLookup[awayTeam.parserids[that.Name]] = awayTeam;
+
     // Execute multiple async functions in parallel getting the player ids and parserids mapping
     async.parallel([
-        function (callback) {
-            that.feedService.LoadTeam(that.matchHandler.home_team, function (error, response) {
-                if (error)
-                    return callback(error);
-
-                response['matchType'] = 'home_team';
-                if (!response.parserids)
-                    return callback(new Error("No parserids[" + that.Name + "]  property in team id " + response.id + " document in Mongo. Aborting."));
-                that.matchTeamsLookup[response.parserids[that.Name]] = response;
-                callback(null);
-            });
-        },
-        function (callback) {
-            that.feedService.LoadTeam(that.matchHandler.away_team, function (error, response) {
-                if (error)
-                    return callback(error);
-
-                response['matchType'] = 'away_team';
-                if (!response.parserids)
-                    return callback(new Error("No parserids[" + that.Name + "]  property in team id " + response.id + " document in Mongo. Aborting."));
-                that.matchTeamsLookup[response.parserids[that.Name]] = response;
-                callback(null);
-            });
-        },
         function (callback) {
             BookMatch(that.matchParserId, (bookErr, bookResult) => {
                 if (!bookErr)
@@ -515,21 +505,9 @@ Parser.prototype.init = function (cbk) {
             });
         },
         function (callback) {
-            that.feedService.LoadCompetition(that.matchHandler.competition, function (error, response) {
-                if (error)
-                    return callback(error);
-
-                that.league = response;
-                callback(null);
-            });
-        },
-        function (callback) {
             that.feedService.LoadPlayers(that.matchHandler.home_team._id, function (error, response) {
                 if (error)
                     return callback(error);
-
-                // if (!_.isArrayLike(response))
-                //     return callback();
 
                 _.forEach(response, function (item) {
                     if (item.parserids && item.parserids[that.Name] && !that.matchPlayersLookup[item.parserids[that.Name]])
@@ -543,9 +521,6 @@ Parser.prototype.init = function (cbk) {
             that.feedService.LoadPlayers(that.matchHandler.away_team._id, function (error, response) {
                 if (error)
                     return callback(error);
-
-                // if (!_.isArrayLike(response))
-                //     return callback();
 
                 _.forEach(response, function (item) {
                     if (item.parserids && item.parserids[that.Name] && !that.matchPlayersLookup[item.parserids[that.Name]])
