@@ -1,8 +1,8 @@
 // Module dependencies.
 var mongoose = require('mongoose'),
-Competition = mongoose.models.competitions,
-Matches = mongoose.models.scheduled_matches,
-Standings = mongoose.models.standings,
+Competition = mongoose.models.trn_seasons,
+Matches = mongoose.models.matches,
+Standings = mongoose.models.trn_standings,
 api = {},
 l=require('../config/lib');
 
@@ -15,7 +15,8 @@ l=require('../config/lib');
 // ALL
 api.getAllCompetitions = function (skip,limit,cb) {
  
-  var q=Competition.find();
+    var q = Competition.find();
+    q.populate('competition');
   
   // if(skip!=undefined)
   //   q.skip(skip*1);
@@ -31,7 +32,7 @@ api.getAllCompetitions = function (skip,limit,cb) {
 // GET
 api.getCompetition = function (id,cb) {
 
-  Competition.findOne({ '_id': id }, function(err, competition) {
+  Competition.findOne({ '_id': id }).populate('competition').exec(function(err, competition) {
     cbf(cb,err,competition);
   });
 };

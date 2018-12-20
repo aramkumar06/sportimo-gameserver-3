@@ -6,11 +6,14 @@
  * function and will call methods on this object in order to moderate it.
  */
 
-var Sports = require('./sports-settings');
-var StatsHelper = require('./StatsHelper');
 
-var moment = require('moment'),
-    winston = require('winston'),
+'use strict';
+
+const Sports = require('./sports-settings');
+const StatsHelper = require('./StatsHelper');
+
+const moment = require('moment'),
+    log = require('winston'),
     _ = require('lodash'),
     mongoConnection = require('../config/db.js'),
     matchEvents = require('../../models/matchEvents'),
@@ -25,43 +28,20 @@ var moment = require('moment'),
     Achievements = require('../../bedbugAchievements');
 
 //var MessagingTools = require.main.require('./sportimo_modules/messaging-tools');
-var MessagingTools = require('../../messaging-tools');
+const MessagingTools = require('../../messaging-tools');
+const PushNotifications = require('../../messaging-tools/PushNotifications');
+const Gamecards = require('../../gamecards');
 
-
-var log = new (winston.Logger)({
-    levels: {
-        prompt: 6,
-        debug: 5,
-        info: 4,
-        core: 3,
-        warn: 1,
-        error: 0
-    },
-    colors: {
-        prompt: 'grey',
-        debug: 'blue',
-        info: 'green',
-        core: 'magenta',
-        warn: 'yellow',
-        error: 'red'
-    }
-});
-
-log.add(winston.transports.Console, {
-    timestamp: true,
-    level: process.env.LOG_LEVEL || 'debug',
-    prettyPrint: true,
-    colorize: 'level'
-});
-
-
-var path = require('path'),
+const path = require('path'),
     fs = require('fs');
 
 /*Bootstrap service*/
-var serviceTypes = {};
+const serviceTypes = {};
 
-var servicesPath = path.join(__dirname, '../services');
+
+
+
+const servicesPath = path.join(__dirname, '../services');
 fs.readdirSync(servicesPath).forEach(function (file) {
     serviceTypes[path.basename(file, ".js")] = require(servicesPath + '/' + file);
 });
@@ -69,7 +49,7 @@ fs.readdirSync(servicesPath).forEach(function (file) {
 
 var matchModule = function (match, shouldInitAutoFeed) {
 
-    var HookedMatch = {}; // = match;
+    const HookedMatch = {}; // = match;
 
     HookedMatch.Timers = {
         Timeout: null,
@@ -115,7 +95,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
     }
 
     // Validations
-    if (HookedMatch.data.timeline.length == 0) {
+    if (HookedMatch.data.timeline.length === 0) {
         HookedMatch.data.state = 0;
         HookedMatch.data.timeline.push({
             "events": []
@@ -127,18 +107,15 @@ var matchModule = function (match, shouldInitAutoFeed) {
     // Setting the game_type ('soccer','basket') and its settings (game segments, duration, etc)
     HookedMatch.sport = Sports[match.sport];
 
-    // establishing a link with gamecards module, where match events should propagate in order to resolve played match wildcards
-    HookedMatch.gamecards = require('../../gamecards');
-    HookedMatch.gamecards.init(match);
     var queueIndex = 0;
     var eventReceiptFromCreationTimeoutSeconds = 10;
     HookedMatch.queue = async.queue(function (matchEvent, callback) {
 
         // --> This creates wait time
         setTimeout(function () {
-            var eventName = matchEvent && matchEvent.data && matchEvent.data.type ? matchEvent.data.type : 'Unknown';
+            const eventName = matchEvent && matchEvent.data && matchEvent.data.type ? matchEvent.data.type : 'Unknown';
             queueIndex++;
-            var now = new Date();
+            const now = new Date();
 
             if (matchEvent && matchEvent.data && matchEvent.data.type && matchEvent.data.type == 'AdvanceSegment') {
                 // log.info('[Match module] %s: %s', queueIndex, eventName);
@@ -249,7 +226,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
     };
 
     HookedMatch.StartService = function (service, callback) {
-        var that = this;
+        const that = this;
 
         if (that.shouldInitAutoFeed == false) return callback(null);
 
@@ -257,7 +234,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
         if (foundService) {
             foundService.Terminate(function () {
                 that.services = _.remove(that.services, function (aservice) {
-                    return (aservice.type == service.type);
+                    return (aservice.type === service.type);
                 });
             });
         }
@@ -288,7 +265,25 @@ var matchModule = function (match, shouldInitAutoFeed) {
         //};
         newService.init(that.data, function (error, initService) {
             if (error) {
-                return callback(error);
+                return PushNotifications.MatchModuleStartupFailure(HookedMatch.data, error, () => {
+
+                    // Update match in memory of being disabled
+                    thisMatch.disabled = true;
+
+                    //Terminate service
+                    if (newService) {
+                        try {
+                            newService.Terminate(() => {
+                                return callback(error);
+                            });
+                        }
+                        catch (err) {
+                            return callback(error);
+                        }
+                    }
+                    else
+                        return callback(error);
+                });
             }
 
             // Register this match module to the events emitted by the new service, but first filter only those relative to its match id (I have to re-evaluate this filter, might be redundant). 
@@ -336,14 +331,14 @@ var matchModule = function (match, shouldInitAutoFeed) {
             initService.emitter.on('emitStats', function (matchid, stats) {
                 log.info(`[Match module ${HookedMatch.name}] Emmiter requested to send Stats_changed`);
                 if (matchid == HookedMatch.data.id)
-                    PubChannel.publish("socketServers", JSON.stringify({
+                    MessagingTools.sendSocketMessage({
                         sockets: true,
                         payload: {
                             type: "Stats_changed",
                             room: HookedMatch.data.id,
                             data: stats
                         }
-                    }));
+                    });
             });
 
             that.services.push(initService);
@@ -354,6 +349,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
 
     HookedMatch.updateFeedMatchStats = function (league, matchid, callback) {
+
         // Check if service of same type already exists 
         var serviceTypeFound = _.find(this.services, {
             type: "rss-feed"
@@ -362,12 +358,13 @@ var matchModule = function (match, shouldInitAutoFeed) {
             return callback(new Error("Service type does not exist. Please add it first."));
 
         serviceTypeFound.updateMatchStats(league, matchid, callback);
-    }
+    };
 
 
     HookedMatch.PauseService = function (service, callback) {
+
         // Check if service of same type already exists 
-        var serviceTypeFound = _.find(this.services, {
+        const serviceTypeFound = _.find(this.services, {
             type: service.type
         });
         if (!serviceTypeFound)
@@ -395,8 +392,9 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
 
     HookedMatch.ResumeService = function (service, callback) {
+
         // Check if service of same type already exists 
-        var serviceTypeFound = _.find(this.services, {
+        const serviceTypeFound = _.find(this.services, {
             type: service.type
         });
         if (!serviceTypeFound)
@@ -422,6 +420,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
 
     HookedMatch.GetServices = function () {
+
         return _.map(HookedMatch.services, function (service) {
             return getServiceDTO(service);
         });
@@ -437,7 +436,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             active: service.isActive()
 
         };
-    }
+    };
 
     // Set services for the first time
     //HookedMatch.moderationServices = match.moderation;
@@ -468,7 +467,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
 
         return cbk(null, HookedMatch);
-    }
+    };
 
     HookedMatch.correctScoreLine = function (homeScore, awayScore, cbk) {
         if (this.data.home_score != homeScore || this.data.away_score != awayScore) {
@@ -479,7 +478,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
         }
         else
             return cbk(null);
-    }
+    };
 
     HookedMatch.updateTimes = function (data, cbk) {
         // console.log(data);
@@ -511,17 +510,16 @@ var matchModule = function (match, shouldInitAutoFeed) {
         }
 
         return cbk(null, HookedMatch);
-    }
+    };
 
     /*  SocketMessage
         Send a socket message to clients registered in match.
     */
     HookedMatch.SocketMessage = function (event) {
-        PubChannel.publish("socketServers", JSON.stringify({
+        MessagingTools.sendSocketMessage({
             sockets: true,
             payload: event
-        }
-        ));
+        });
 
         return "Done";
     };
@@ -560,7 +558,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 else
                     return log.error(errMsg);
             }
-            if (thisMatch.state == HookedMatch.sport.segments.length - 1) {
+            if (thisMatch.state === HookedMatch.sport.segments.length - 1) {
                 const errMsg = `Cannot advance past the last soccer match segment`;
                 log.warn(errMsg);
                 if (callback)
@@ -588,133 +586,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             // Resetting lastEventTime, to be able to accept events right after the start of the Segment
             HookedMatch.lastEventTime = 0;
 
-            if (thisMatch.state === 0) {
-                if (HookedMatch.data.settings.sendPushes == undefined || HookedMatch.data.settings.sendPushes) {
-                    async.parallel([
-                        (cbk) => {
-                            useractivities.find({ room: HookedMatch.id })
-                                .select('user')
-                                .exec(cbk);
-                        },
-                        (cbk) => {
-                            serversettings.findOne({}, cbk);
-                        },
-                        (cbk) => {
-                            users.find({ $or: [{ favoriteteams: HookedMatch.data.home_team.id }, { favoriteteams: HookedMatch.data.away_team.id }] }).select('_id').exec(cbk);
-                        }
-                    ], (parallelErr, results) => {
-                        if (!parallelErr) {
-                            var userIdsHavingPlayedCard = _.compact(_.map(results[0], 'user'));
-                            var userIdsHavingFavoriteTeam = _.map(results[2], 'id');
-                            var pushNotifications = results[1].pushNotifications;
-
-                            userIdsHavingFavoriteTeam = _.difference(userIdsHavingFavoriteTeam, userIdsHavingPlayedCard);
-
-                            var matchName = { en: '', ar: '' };
-
-                            if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.en)
-                                matchName.en += thisMatch.home_team.name.en;
-                            else matchName.en += 'Home team';
-                            matchName.en += ' - ';
-                            if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.en)
-                                matchName.en += thisMatch.away_team.name.en;
-                            else matchName.en += 'Away team';
-
-                            if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.ar)
-                                matchName.ar += thisMatch.home_team.name.ar;
-                            else matchName.ar += 'Home team';
-                            matchName.ar += ' - ';
-                            if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.ar)
-                                matchName.ar += thisMatch.away_team.name.ar;
-                            else matchName.ar += 'Away team';
-
-
-
-                            var msgE2 = {
-                                en: `️⚽ ${matchName.en} is kicking off! Can you rank in the top-10? Join the game and see!`,
-                                ar: `️⚽ مباراة ${matchName.ar} ستبدأ!
-هل ستكون مع أفضل 10 لاعبين؟ شارك باللعب لتعرف!`
-                            };
-                            var msgE1 = {
-                                en: `Don't miss out on  your favorite team! ${matchName.en} is going live: Start playing your cards NOW ⚽`,
-                                ar: `لا تفوت فريقك المفضل! مبارة ${matchName.ar} بدأت للتو!
-ابدأ لعب بطاقاتك الآن ⚽` 
-                            };
-
-                            // Send push notification to users that the game has started.
-                            if (!HookedMatch.data.disabled) {
-                                if (pushNotifications && pushNotifications.E2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
-                                    log.info(`[Match module ${HookedMatch.name }]: Sending match start E2 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
-                                    MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgE2, { "type": "view", "data": { "view": "match", "viewdata": HookedMatch.id } }, "kick_off");
-                                }
-                                if (pushNotifications && pushNotifications.E1 && userIdsHavingFavoriteTeam && userIdsHavingFavoriteTeam.length > 0) {
-                                    log.info(`[Match module ${HookedMatch.name }]: Sending match start E1 notification to users: ${_.take(userIdsHavingFavoriteTeam, 9)}, ...`);
-                                    MessagingTools.sendPushToUsers(userIdsHavingFavoriteTeam, msgE1, { "type": "view", "data": { "view": "match", "viewdata": HookedMatch.id } }, "kick_off");
-                                }
-                            }
-                        }
-                        else {
-                            log.error(`[Match module ${HookedMatch.name}]: Failed to send notifications on match start: ${parallelErr.stack}`);
-                        }
-                    });
-
-                }
-            }
-            else if (thisMatch.state === 1) {
-                if (HookedMatch.data.settings.sendPushes === undefined || HookedMatch.data.settings.sendPushes) {
-                    async.parallel([
-                        (cbk) => {
-                            useractivities.find({ room: HookedMatch.id })
-                                .select('user')
-                                .exec(cbk);
-                        },
-                        (cbk) => {
-                            serversettings.findOne({}, cbk);
-                        }
-                    ], (parallelErr, results) => {
-                        if (!parallelErr) {
-                            var userIdsHavingPlayedCard = _.compact(_.map(results[0], 'user'));
-                            var pushNotifications = results[1].pushNotifications;
-
-                            var matchName = { en: '', ar: '' };
-
-                            if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.en)
-                                matchName.en += thisMatch.home_team.name.en;
-                            else matchName.en += 'Home team';
-                            matchName.en += ' ' + thisMatch.home_score + ' - ' + thisMatch.away_score + ' ';
-                            if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.en)
-                                matchName.en += thisMatch.away_team.name.en;
-                            else matchName.en += 'Away team';
-
-                            if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.ar)
-                                matchName.ar += thisMatch.home_team.name.ar;
-                            else matchName.ar += 'Home team';
-                            matchName.ar += ' ' + thisMatch.home_score + ' - ' + thisMatch.away_score + ' ';
-                            if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.ar)
-                                matchName.ar += thisMatch.away_team.name.ar;
-                            else matchName.ar += 'Away team';
-
-
-                            var msgG2 = {
-                                en: `Time to take a break! Half-Time for ${matchName.en}`,
-                                ar: `وقت الإستراحة!
-استراحة مابين الشوطين لمباراة ${matchName.ar}`
-                            };
-
-                            // Send push notification to users that the game has started.
-                            if (!HookedMatch.data.disabled) {
-                                if (pushNotifications && pushNotifications.G2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
-                                    log.info(`[Match module ${HookedMatch.name }]: Sending match half-time G2 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
-                                    MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgG2, { "type": "view", "data": { "view": "match", "viewdata": HookedMatch.id } }, "kick_off");
-                                }
-                            }
-                        }
-                        else {
-                            log.error(`[Match module ${HookedMatch.name}]: Failed to send notifications on match half-time: ${parallelErr.stack}`);
-                        }
-                    });
-                }
-            }
+            PushNotifications.SegmentAdvance(thisMatch, () => { });
 
             // Register the time that the previous segment ended
             thisMatch.timeline[thisMatch.state].end = moment().utc().format();
@@ -741,14 +613,14 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 thisMatch.timeline[thisMatch.state].events.push(evtObject);
 
                 // Inform Clients for the new event to draw
-                PubChannel.publish("socketServers", JSON.stringify({
+                MessagingTools.sendSocketMessage({
                     sockets: true,
                     payload: {
                         type: "Event_added",
                         room: HookedMatch.id.toString(),
                         data: evtObject
                     }
-                }));
+                });
             }
 
 
@@ -763,7 +635,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 text: HookedMatch.sport.segments[thisMatch.state].name,
                 break_time: 0,
                 events: []
-            }
+            };
 
             thisMatch.timeline.push(newSegment);
             thisMatch.markModified('timeline');
@@ -771,7 +643,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             setMatchStatForTo(HookedMatch.id, thisMatch.stats, 'Segment', thisMatch.state);
             thisMatch.markModified('stats');
 
-            HookedMatch.gamecards.GamecardsAppearanceHandle({
+            Gamecards.GamecardsAppearanceHandle({
                 matchid: match.id,
                 time: null,
                 playerid: null,
@@ -787,7 +659,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 stats: thisMatch.stats,
                 timeline: thisMatch.timeline,
                 away_score: thisMatch.away_score
-            }
+            };
 
             matches.findOneAndUpdate({ _id: thisMatch._id }, updateObject, { new: true }, function (err, result) {
                 // thisMatch.save(function (err, done) {
@@ -815,7 +687,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
                 // Send new segment change to clients
                 // Inform Clients for the new event to draw
-                PubChannel.publish("socketServers", JSON.stringify({
+                MessagingTools.sendSocketMessage({
                     sockets: true,
                     payload: {
                         type: "Advance_Segment",
@@ -829,18 +701,17 @@ var matchModule = function (match, shouldInitAutoFeed) {
                             timeline_event: false
                         }
                     }
-                }));
+                });
                 log.info(`[Match module ${HookedMatch.name}]: We are sending Stats_changed here on Advance Segment`);
                 // Inform the system about the segment change
-                PubChannel.publish("socketServers", JSON.stringify({
+                MessagingTools.sendSocketMessage({
                     sockets: true,
                     payload: {
                         type: "Stats_changed",
                         room: thisMatch._id,
                         data: thisMatch.stats
                     }
-                }
-                ));
+                });
 
 
 
@@ -858,8 +729,8 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 //     }
                 // };
 
-                // HookedMatch.gamecards.ResolveEvent(segmentEvent);
-                HookedMatch.gamecards.ResolveSegment(HookedMatch.id, thisMatch.state);
+                // Gamecards.ResolveEvent(segmentEvent);
+                Gamecards.ResolveSegment(HookedMatch.id, thisMatch.state);
 
                 // Check if we should initiate a match timer to change the main TIME property.
                 startMatchTimer();
@@ -924,7 +795,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             segmentStart = segment.start;
             secondsToMinuteTick = 60 - moment.duration(moment().diff(moment(segment.start))).seconds();
 
-            HookedMatch.gamecards.GamecardsAppearanceHandle({
+            Gamecards.GamecardsAppearanceHandle({
                 matchid: match.id,
                 time: null,
                 playerid: null,
@@ -980,7 +851,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             setMatchStatForTo(id, thisMatch.stats, 'Minute', thisMatch.time);
             thisMatch.markModified('stats');
 
-            HookedMatch.gamecards.GamecardsAppearanceHandle({
+            Gamecards.GamecardsAppearanceHandle({
                 matchid: match.id,
                 time: null,
                 playerid: null,
@@ -992,15 +863,14 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
             log.info(`[Match module ${HookedMatch.name}]: We are sending Stats_changed here on Match Time`);
             // Inform the system about the stat changes
-            PubChannel.publish("socketServers", JSON.stringify({
+            MessagingTools.sendSocketMessage({
                 sockets: true,
                 payload: {
                     type: "Stats_changed",
                     room: thisMatch._id,
                     data: thisMatch.stats
                 }
-            }
-            ));
+            });
 
             matches.findByIdAndUpdate(id, { $set: { "stats": thisMatch.stats, "time": thisMatch.time } }, function (err, result) {
                 log.info(`[Match module ${HookedMatch.name}]: Match has reached ${thisMatch.time}'`);
@@ -1088,13 +958,13 @@ var matchModule = function (match, shouldInitAutoFeed) {
             HookedMatch.data.home_score = homeScore;
             HookedMatch.data.away_score = awayScore;
 
-            PubChannel.publish("socketServers", JSON.stringify({
+            MessagingTools.sendSocketMessage({
                 sockets: true,
                 payload: {
                     type: "Match_Reload",
                     room: HookedMatch.data._id.toString()
                 }
-            }));
+            });
 
             return matches.findOneAndUpdate({ _id: thisMatch._id }, { home_score: homeScore, away_score: awayScore, stats: thisMatch.stats }, cbk);
         });
@@ -1188,62 +1058,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                     else
                         thisMatch.away_score++;
 
-                    if (HookedMatch.data.settings.sendPushes == undefined || HookedMatch.data.settings.sendPushes) {
-
-                        async.parallel([
-                            (innerCbk) => {
-                                useractivities.find({ room: HookedMatch.id })
-                                    .select('user')
-                                    .exec(innerCbk);
-                            },
-                            (innerCbk) => {
-                                serversettings.findOne({}, innerCbk);
-                            }
-                        ], (parallelErr, results) => {
-                            if (!parallelErr) {
-                                var userIdsHavingPlayedCard = _.compact(_.map(results[0], 'user'));
-                                var pushNotifications = results[1].pushNotifications;
-
-                                var matchName = { en: '', ar: '' };
-
-                                if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.en)
-                                    matchName.en += thisMatch.home_team.name.en;
-                                else matchName.en += 'Home team';
-                                matchName.en += ' ' + thisMatch.home_score + ' - ' + thisMatch.away_score + ' ';
-                                if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.en)
-                                    matchName.en += thisMatch.away_team.name.en;
-                                else matchName.en += 'Away team';
-
-                                if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.ar)
-                                    matchName.ar += thisMatch.home_team.name.ar;
-                                else matchName.ar += 'Home team';
-                                matchName.ar += ' ' + thisMatch.home_score + ' - ' + thisMatch.away_score + ' ';
-                                if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.ar)
-                                    matchName.ar += thisMatch.away_team.name.ar;
-                                else matchName.ar += 'Away team';
-
-                                var teamName = { en: evtObject.team == "home_team" ? thisMatch.home_team.name.en : thisMatch.away_team.name.en };
-
-
-                                var msgG1 = {
-                                    en: `⚽ ${teamName.en} has scored at ${thisMatch.time}' for ${matchName.en}. See if you have won any points!👍`,
-                                    ar: ` ⚽فريق ${teamName.ar} سجل هدف في الدقيقة ${thisMatch.time} في مباراة ${matchName.en}. هل سجلت أي نقاط؟ لنر! 👍`
-                                };
-
-                                // Send push notification to users that a goal is kicked.
-                                if (!HookedMatch.data.disabled) {
-                                    if (pushNotifications && pushNotifications.G1 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
-                                        log.info(`[Match module ${HookedMatch.name}]: Sending match Goal G1 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
-                                        MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgG1, { "type": "view", "data": { "view": "match", "viewdata": HookedMatch.id } }, "goals");
-                                    }
-                                }
-                            }
-                            else {
-                                log.error(`[Match module ${HookedMatch.name}]: Failed to send notifications on match Goal: ${parallelErr.stack}`);
-                            }
-                        });
-
-                    }
+                    PushNotifications.Goal(thisMatch, evtObject.team, () => { });
                 }
             }
 
@@ -1266,7 +1081,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             if (!event.data.team_id && event.data.team && event.data.team == 'away_team')
                 event.data.team_id = thisMatch.away_team;
 
-            HookedMatch.gamecards.ResolveEvent(event);
+            Gamecards.ResolveEvent(event);
 
             StatsHelper.UpsertStat("system", {
                 events_sent: 1
@@ -1279,30 +1094,28 @@ var matchModule = function (match, shouldInitAutoFeed) {
             if (!event.data.created)
                 event.data.created = moment().utc().format();
 
-            HookedMatch.gamecards.GamecardsAppearanceHandle(event, thisMatch);
+            Gamecards.GamecardsAppearanceHandle(event, thisMatch);
 
             // Inform Clients for the new event to draw
-            PubChannel.publish("socketServers", JSON.stringify({
+            MessagingTools.sendSocketMessage({
                 sockets: true,
                 payload: {
                     type: "Event_added",
                     room: event.data.match_id.toString(),
                     data: event.data
                 }
-            }
-            ));
+            });
 
             log.info(`[Match module ${HookedMatch.name}]: We are sending Stats_changed here on Add Event`);
             // Inform the system about the stat changes
-            PubChannel.publish("socketServers", JSON.stringify({
+            MessagingTools.sendSocketMessage({
                 sockets: true,
                 payload: {
                     type: "Stats_changed",
                     room: event.data.match_id.toString(),
                     data: thisMatch.stats
                 }
-            }
-            ));
+            });
 
             var updateObject = {
                 home_score: thisMatch.home_score,
@@ -1392,27 +1205,25 @@ var matchModule = function (match, shouldInitAutoFeed) {
         // PubChannel.publish("socketServers", JSON.stringify(event));
 
         // Inform Clients for the new event to draw
-        PubChannel.publish("socketServers", JSON.stringify({
+        MessagingTools.sendSocketMessage({
             sockets: true,
             payload: {
                 type: "Event_updated",
                 room: eventToUpdate.match_id,
                 data: eventToUpdate
             }
-        }
-        ));
+        });
 
         log.info(`[Match module ${HookedMatch.name}]: We are sending Stats_changed here on Update Event`);
         // Inform the system about the stat changes
-        PubChannel.publish("socketServers", JSON.stringify({
+        MessagingTools.sendSocketMessage({
             sockets: true,
             payload: {
                 type: "Stats_changed",
                 room: eventToUpdate.match_id,
                 data: match.stats
             }
-        }
-        ));
+        });
 
         // 3. save match to db
         // this.data.markModified('timeline');
@@ -1438,7 +1249,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
             //     HookedMatch.data = _.merge(HookedMatch.data, updateObject);
 
             // ToDo: When ready, uncomment the following:
-            // HookedMatch.gamecards.ReEvaluateAll(HookedMatch.id, function(gamecardsError) {
+            // Gamecards.ReEvaluateAll(HookedMatch.id, function(gamecardsError) {
             //     if (gamecardsError)
             //         log.error(gamecardsError);
 
@@ -1534,19 +1345,18 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 HookedMatch.data = _.merge(HookedMatch.data, updateObject);
 
             // ToDo: When ready, uncomment the following:
-            HookedMatch.gamecards.ReEvaluateAll(HookedMatch.id, function (gamecardsError) {
+            Gamecards.ReEvaluateAll(HookedMatch.id, function (gamecardsError) {
                 if (gamecardsError)
                     log.error(gamecardsError);
 
                 // Inform Clients for the new event to draw
-                PubChannel.publish("socketServers", JSON.stringify({
+                MessagingTools.sendSocketMessage({
                     sockets: true,
                     payload: {
                         type: "Match_Reload",
                         room: that.data._id.toString(),
                     }
-                }
-                ));
+                });
 
                 if (cbk)
                     return cbk(null, eventToDelete);
@@ -1582,71 +1392,16 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
                 async.parallel([
                     (cbk) => {
-                        if (HookedMatch.data.settings.sendPushes == undefined || HookedMatch.data.settings.sendPushes) {
-                            async.parallel([
-                                (innerCbk) => {
-                                    useractivities.find({ room: HookedMatch.id })
-                                        .select('user')
-                                        .exec(innerCbk);
-                                },
-                                (innerCbk) => {
-                                    serversettings.findOne({}, innerCbk);
-                                }
-                            ], (parallelErr, results) => {
-                                if (!parallelErr) {
-                                    var userIdsHavingPlayedCard = _.compact(_.map(results[0], 'user'));
-                                    var pushNotifications = results[1].pushNotifications;
-
-                                    var matchName = { en: '', ar: '' };
-
-                                    if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.en)
-                                        matchName.en += thisMatch.home_team.name.en;
-                                    else matchName.en += 'Home team';
-                                    matchName.en += ' ' + thisMatch.home_score + ' - ' + thisMatch.away_score + ' ';
-                                    if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.en)
-                                        matchName.en += thisMatch.away_team.name.en;
-                                    else matchName.en += 'Away team';
-
-                                    if (thisMatch.home_team && thisMatch.home_team.name && thisMatch.home_team.name.ar)
-                                        matchName.ar += thisMatch.home_team.name.ar;
-                                    else matchName.ar += 'Home team';
-                                    matchName.ar += ' ' + thisMatch.home_score + ' - ' + thisMatch.away_score + ' ';
-                                    if (thisMatch.away_team && thisMatch.away_team.name && thisMatch.away_team.name.ar)
-                                        matchName.ar += thisMatch.away_team.name.ar;
-                                    else matchName.ar += 'Away team';
-
-
-                                    var msgG3 = {
-                                        en: `Full-Time for ${matchName.en}`,
-                                        ar: `انتهى وقت المباراة ${matchName.ar}`
-                                    };
-
-                                    // Send push notification to users that the game has ended.
-                                    if (!HookedMatch.data.disabled) {
-                                        if (pushNotifications && pushNotifications.G3 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
-                                            log.info(`Sending match full-time G3 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
-                                            MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgG3, { "type": "view", "data": { "view": "match", "viewdata": HookedMatch.id } }, "final_result");
-                                        }
-                                    }
-                                }
-                                else {
-                                    log.error(`[Match module ${HookedMatch.name}]: Failed to send notifications on match termination: ${parallelErr.stack}`);
-                                }
-
-                                return cbk(null);
-                            });
-                        }
-                        else
-                            return async.setImmediate(() => { cbk(null); });
+                        return PushNotifications.Termination(thisMatch, cbk);
                     },
                     (cbk) => {
-                        HookedMatch.gamecards.TerminateMatch(HookedMatch.data, (gameCardErr) => {
+                        Gamecards.TerminateMatch(HookedMatch.data, (gameCardErr) => {
                             if (gameCardErr)
                                 log.error(gameCardErr);
 
                             log.info(`[Match module ${HookedMatch.name}]: Now that the end gamecards have been resolved, reward players for achievements`);
 
-                            if (HookedMatch.data.settings.sendPushes == undefined || HookedMatch.data.settings.sendPushes) {
+                            if (HookedMatch.data.settings.sendPushes === undefined || HookedMatch.data.settings.sendPushes) {
                                 return async.parallel([
                                 // Handle all achievements calculated at the end of a match
                                     // 1. Persistant Gamer
@@ -1661,13 +1416,13 @@ var matchModule = function (match, shouldInitAutoFeed) {
                     }
                 ], () => {
                     // Inform Clients for the match completion
-                    PubChannel.publish("socketServers", JSON.stringify({
+                    MessagingTools.sendSocketMessage({
                         sockets: true,
                         payload: {
                             type: "Match_full_time",
-                            room: HookedMatch.id.toString(),
+                            room: HookedMatch.id.toString()
                         }
-                    }));
+                    });
 
                     HookedMatch.Cleanup((cleanupErr) => {
                         if (cleanupErr) {

@@ -1,6 +1,7 @@
 // get an instance of mongoose and mongoose.Schema
 var mongoose = require('mongoose'),
     bcrypt = require("bcryptjs"),
+    moment = require('moment'),
     Schema = mongoose.Schema;
 
 var userStats = new Schema({
@@ -57,6 +58,7 @@ var UserSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: 'trn_clients'
         },
+        wallet: { type: Number, default: 0 },   // gold tickets
         password: {
             type: String,
             required: true
@@ -124,7 +126,9 @@ var UserSchema = new Schema(
         isOnline: { type: Boolean, default: false },
         deletedAt: { type: Date },
         deletionReason: { type: String },
-        lastLoginAt: { type: Date }
+        lastLoginAt: { type: Date },
+        lastConsecutiveDayLoginAt: { type: Date },
+        consecutiveDayLogins: { type: Number, default: 0 }
     },
     {
         timestamps: { updatedAt: 'lastActive' },
@@ -145,7 +149,7 @@ UserSchema.pre('save', function (next) {
         Achievements.find({}, function (err, achievs) {
             user.achievements = achievs;
             user.inbox = ['578f65b748def8d8836b7094'];
-            
+
             bcrypt.genSalt(10, function (err, salt) {
                 if (err) {
                     return next(err);
@@ -156,12 +160,12 @@ UserSchema.pre('save', function (next) {
                         return next(err);
                     }
                     user.password = hash;
-                    
+
                     next();
                 });
             });
 
-        })
+        });
     }
     else if (this.isModified('password')) {
         console.log('Password was modified');
@@ -208,14 +212,63 @@ UserSchema.methods.comparePassword = function (passw, cb) {
     });
 };
 
+
+UserSchema.methods.computeLoyalty = function () {
+    const gtMultiplier = 1;
+    const loyaltyScheme = [0, 1, 2, 3, 4, 5, 6, 7];  // golden tickets awarded for the  consecutive logins number of the loyaltyScheme array index.
+
+    // Compute consecutive day logins and update lastConsecutiveDayLoginAt time
+    const lastConsecutiveDayLogin = this.lastConsecutiveDayLoginAt;
+    const now = new Date();
+    const momentNowStartOfDay = moment.utc(now).startOf('day');
+
+    const userDayLoyalty = {
+        lastConsecutiveDayLoginAt: null,
+        consecutiveDayLogins: 0,
+        goldTickets: 0
+    };
+
+    if (!lastConsecutiveDayLogin || !this.lastLoginAt) {
+        userDayLoyalty.consecutiveDayLogins = 0;
+    }
+    else {
+        const timeDiff = momentNowStartOfDay.clone().diff(moment.utc(lastConsecutiveDayLogin), 'd', true);
+        if (timeDiff > 1) {
+            userDayLoyalty.consecutiveDayLogins = 0;
+            if (userDayLoyalty.consecutiveDayLogins >= loyaltyScheme.length)
+                userDayLoyalty.goldTickets = _.tail(loyaltyScheme) * gtMultiplier;
+            else
+                userDayLoyalty.goldTickets = loyaltyScheme[userDayLoyalty.consecutiveDayLogins];
+        }
+        else {
+            const lastLoginTimeDiff = momentNowStartOfDay.clone().diff(moment.utc(this.lastLoginAt).startOf('day'), 'd', true);
+
+            if (lastLoginTimeDiff > 0) {
+                userDayLoyalty.consecutiveDayLogins = this.consecutiveDayLogins + 1;
+                if (userDayLoyalty.consecutiveDayLogins >= loyaltyScheme.length)
+                    userDayLoyalty.goldTickets = _.tail(loyaltyScheme) * gtMultiplier;
+                else
+                    userDayLoyalty.goldTickets = loyaltyScheme[userDayLoyalty.consecutiveDayLogins];
+            }
+        }
+    }
+    userDayLoyalty.lastConsecutiveDayLoginAt = momentNowStartOfDay.toDate();
+
+    return userDayLoyalty;
+};
+
 UserSchema.methods.onLogin = function (cb) {
-    this.lastLoginAt = new Date();
+
+    const now = new Date();
+
+    // Update last login time
+    this.lastLoginAt = now;
 
     if (cb)
         return this.save(cb);
     else
         this.save();
-}
+};
 
 // Assign a method to create and increment stats
 // statChange can be any new value and should follow

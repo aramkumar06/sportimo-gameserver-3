@@ -7,11 +7,15 @@
  */
 
 /*  Libraries   */
+
+'use strict';
+
+
 var path = require('path'),
     fs = require('fs'),
     _ = require('lodash'),
     bodyParser = require('body-parser'),
-    winston = require('winston'),
+    log = require('winston'),
     mongoose = require('mongoose'),
     async = require('async');
 
@@ -19,7 +23,7 @@ var scheduler = require('node-schedule');
 var moment = require('moment');
 
 var MessagingTools = require('../messaging-tools');
-
+const Gamecards = require('../gamecards');
 
 //var memwatch = require('memwatch-next');
 //memwatch.on('leak', function (info) {
@@ -27,43 +31,41 @@ var MessagingTools = require('../messaging-tools');
 //});
 //memwatch.on('stats', function (stats) { console.log('Heap stats: ' + JSON.stringify(stats, null, '\t')); });
 
-var log = new (winston.Logger)({
-    levels: {
-        prompt: 6,
-        debug: 5,
-        info: 4,
-        core: 3,
-        warn: 1,
-        error: 0
-    },
-    colors: {
-        prompt: 'grey',
-        debug: 'blue',
-        info: 'green',
-        core: 'magenta',
-        warn: 'yellow',
-        error: 'red'
-    }
-});
+//var log = new (winston.Logger)({
+//    levels: {
+//        prompt: 6,
+//        debug: 5,
+//        info: 4,
+//        core: 3,
+//        warn: 1,
+//        error: 0
+//    },
+//    colors: {
+//        prompt: 'grey',
+//        debug: 'blue',
+//        info: 'green',
+//        core: 'magenta',
+//        warn: 'yellow',
+//        error: 'red'
+//    }
+//});
 
-log.add(winston.transports.Console, {
-    timestamp: true,
-    level: process.env.LOG_LEVEL || 'debug',
-    prettyPrint: true,
-    colorize: 'level'
-});
+//log.add(winston.transports.Console, {
+//    timestamp: true,
+//    level: process.env.LOG_LEVEL || 'debug',
+//    prettyPrint: true,
+//    colorize: 'level'
+//});
 
 // Sportimo Moderation sub-Modules
 var match_module = require('./lib/match-module.js');
 
-/*Bootstrap models*/
 var team = null,
-    scheduled_matches = null,
-    matches = require('../models/match'),
-    tournaments = require('../models/tournament'),
-    tournamentMatches = require('../models/trn_match'),
-    feedstatuses = mongoose.models.matchfeedStatuses,
-    users = mongoose.models.users;
+    matches = null,
+    tournaments = null,
+    tournamentMatches = null,
+    feedstatuses = null,
+    users = null;
 
 /**
  * Redis Pub/Sub Channels
@@ -93,14 +95,14 @@ var ModerationModule = {
     //         return timer;
     //     }
     // },
-    ModeratedTournamentMatches: [],
-    ModeratedMatches: [],
+    ModeratedMatchLookup: {},
+    ModeratedTmatchLookup: {},
+    //ModeratedMatches: [],
 
     testing: false,
     mongoose: null,
-    mock: false,
     count: function () {
-        return _.size(this.ModeratedMatches);
+        return _.size(ModerationModule.ModeratedMatchLookup);
     },
     init: function (done) {
         initModule(done);
@@ -113,24 +115,22 @@ var ModerationModule = {
             console.log("---------------------------------------------------------------------------------------------");
         }
 
-        if (this.mock) return;
+        /* Bootstrap models */
         this.mongoose = mongooseConnection;
         var modelsPath = path.join(__dirname, '../models');
         fs.readdirSync(modelsPath).forEach(function (file) {
             require(modelsPath + '/' + file);
         });
-        team = this.mongoose.models.team;
-        scheduled_matches = this.mongoose.models.scheduled_matches;
+
+        team = this.mongoose.models.trn_team;
+        matches = this.mongoose.models.matches;
+        tournaments = this.mongoose.models.tournaments;
+        tournamentMatches = this.mongoose.models.trn_matches;
+        feedstatuses = this.mongoose.models.feedmatchstatuses;
+        users = this.mongoose.models.users;
         // log.info("Connected to MongoDB");
-
-        // Initialize the gamecards module
-        var gamecards = require('../gamecards');
-        gamecards.connect(this.mongoose, RedisClientPub, RedisClientSub);
-
     },
     SetupRedis: function (Pub, Sub, Channel) {
-
-        if (this.mock) return;
 
         // Initialize and connect to the Redis datastore
         RedisClientPub = Pub;
@@ -139,7 +139,7 @@ var ModerationModule = {
         setInterval(function () {
 
             RedisClientPub.publish("socketServers", JSON.stringify({
-                server: "[Moderation] Active matches: " + ModerationModule.ModeratedMatches.length
+                server: "[Moderation] Active matches: " + ModerationModule.count()
             }));
 
         }, 30000);
@@ -215,7 +215,7 @@ var ModerationModule = {
         }
     },
     ResetMatch: function (matchid, cbk) {
-        scheduled_matches.findOne({
+        matches.findOne({
             _id: matchid
         }).exec(function (err, match) {
             match.stats = [];
@@ -234,7 +234,7 @@ var ModerationModule = {
         });
     },
     ToggleMatchComplete: function (matchid, cbk) {
-        scheduled_matches.findOne({
+        matches.findOne({
             _id: matchid
         }).exec(function (err, match) {
             match.completed = !match.completed;
@@ -253,72 +253,56 @@ var ModerationModule = {
     },
     LoadMatchFromDB: function (matchid, cbk) {
 
-        if (!this.mock) {
-            tournamentMatches
-                .findOne({
-                    _id: matchid
-                })
-                .populate({ path: 'match', populate: [{ path: 'home_team' }, { path: 'away_team' }, { path: 'competition' }] })
-                .exec(function (err, tournamentMatch) {
-                    if (err)
-                        return cbk(err);
+        tournamentMatches
+        .findOne({
+            _id: matchid
+        })
+        .populate({ path: 'match', populate: [{ path: 'home_team', select: 'name abbr logo color' }, { path: 'away_team', select: 'name abbr logo color' }, { path: 'season' }] })
+        .exec(function (err, tournamentMatch) {
+            if (err)
+                return cbk(err);
 
-                    if (!tournamentMatch) {
-                        log.info(ModerationModule.count);
-                        if (cbk)
-                            return cbk("No match with this ID could be found in the database. There must be a match in the database already in order for it to be transfered to the Active matches", null);
-                        else
-                            return null;
-                    }
+            if (!tournamentMatch) {
+                log.info(ModerationModule.count);
+                if (cbk)
+                    return cbk("No match with this ID could be found in the database. There must be a match in the database already in order for it to be transfered to the Active matches", null);
+                else
+                    return null;
+            }
 
-                    var foundMatch = _.find(ModerationModule.ModeratedMatches, { id: match.id });
+            var foundMatch = ModerationModule.ModeratedTmatchLookup[match.id];
 
-                    if (foundMatch) {
-                        // Terminate the active services on the match
-                        foundMatch.Terminate(() => {
-                            // Clear all timers that might be active
-                            foundMatch.Timers.clear();
-                            // remove match in case it already exists
-                            _.remove(ModerationModule.ModeratedMatches, {
-                                id: matchid
-                            });
-                            // Release to GC
-                            foundMatch = null;
+            if (foundMatch) {
+                // Terminate the active services on the match
+                foundMatch.Terminate(() => {
+                    // Clear all timers that might be active
+                    foundMatch.Timers.clear();
+                    // remove match in case it already exists
+                    delete ModerationModule.RemoveFromLookup(foundMatch.id);
 
-                            var hookedMatch = new match_module(match, shouldInitAutoFeed);
+                    // Release to GC
+                    foundMatch = null;
 
-                            ModerationModule.ModeratedMatches.push(hookedMatch);
-                            log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Hooking on it.");
+                    const hookedMatch = ModerationModule.InsertInLookup(tournamentMatch);
 
-                            if (cbk)
-                                return cbk(null, hookedMatch);
-                            else
-                                return hookedMatch;
-                        });
-                    }
-                    else {
-                        var hookedMatch = new match_module(match, shouldInitAutoFeed);
-
-                        ModerationModule.ModeratedMatches.push(hookedMatch);
-                        log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Hooking on it.");
-
-                        if (cbk)
-                            return cbk(null, hookedMatch);
-                        else
-                            return hookedMatch;
-                    }
+                    if (cbk)
+                        return cbk(null, hookedMatch);
+                    else
+                        return hookedMatch;
                 });
-        } else {
-            var trnMatch = new tournamentMatches(mockMatch);
-            var hookedMatch = new match_module(trnMatch);
-            ModerationModule.ModeratedMatches.push(hookedMatch);
-            log.info("Found match with ID [" + hookedMatch.id + "]. Hooking on it.");
+            }
+            else {
+                const hookedMatch = ModerationModule.InsertInLookup(tournamentMatch);
 
-            return hookedMatch;
-        }
+                if (cbk)
+                    return cbk(null, hookedMatch);
+                else
+                    return hookedMatch;
+            }
+        });
     },
-    GetMatch: function (matchID, cbk) {
-        var match = _.find(ModerationModule.ModeratedMatches, { id: matchID });
+    GetMatch: function (tmatchId, cbk) {
+        var match = ModerationModule.ModeratedTmatchLookup[tmatchId];
 
         if (match) {
             if (cbk)
@@ -326,7 +310,59 @@ var ModerationModule = {
             else
                 return match;
         } else {
-            ModerationModule.LoadMatchFromDB(matchID, cbk);
+            ModerationModule.LoadMatchFromDB(tmatchId, cbk);
+        }
+    },
+    // the tournamentMatch includes both tournament refs and the match in its match property, while the hookedMatch includes in its data property the match only
+    InsertInLookup: function (tournamentMatch) {
+
+        // Check tmatch existence in lookups, Validate tmatch
+        const tmatchId = tournamentMatch.id;
+        if (!tmatchId || ModerationModule.ModeratedTmatchLookup[tmatchId] || !tournamentMatch.match)
+            return;
+
+        const matchId = tournamentMatch.match.id;
+
+        let hookedMatch = ModerationModule.ModeratedTmatchLookup[tmatchId];
+
+        if (hookedMatch) {
+            // terminate and remove existing match ...
+        }
+
+
+        if (!ModerationModule.ModeratedMatchLookup[matchId]) {
+            hookedMatch = new match_module(tournamentMatch.match, shouldInitAutoFeed);
+            ModerationModule.ModeratedMatchLookup[hookedMatch.id] = [tournamentMatch];
+            log.info(`[Moderation] Found match with ID [${tmatchId}] ([${matchId}]). Creating match instance.`);
+
+            // Initiate gamecards logic, if not already, and create card definitions for the match, if not already created
+            Gamecards.init(tournamentMatch);
+        }
+        else {
+            ModerationModule.ModeratedMatchLookup[matchId].push(tournamentMatch);
+            hookedMatch = _.find(ModerationModule.ModeratedTmatchLookup, { 'id': matchId });
+            log.info(`[Moderation] Found match with ID [${tmatchId}] ([${matchId}]). Hooking on it.`);
+        }
+        ModerationModule.ModeratedTmatchLookup[tmatchId] = hookedMatch;
+
+        return hookedMatch;
+    },
+    RemoveFromLookup: function (tmatchId) {
+
+        const hookedMatch = ModerationModule.ModeratedTmatchLookup[tmatchId];
+
+        if (!hookedMatch)
+            return;
+
+        //const hookedMatch = ModerationModule.ModeratedMatchLookup[tmatch.id];
+        const matchId = hookedMatch.id;
+        delete ModerationModule.ModeratedTmatchLookup[tmatchId];
+
+        const tournamentMatches = ModerationModule.ModeratedMatchLookup[matchId];
+        if (tournamentMatches.length === 1)
+            delete ModerationModule.ModeratedMatchLookup[matchId];
+        else {
+            _.remove(ModerationModule.ModeratedMatchLookup[matchId], { 'id': tmatchId });
         }
     }
     //    InjectEvent: function (evnt, res) {
@@ -334,7 +370,7 @@ var ModerationModule = {
     //    },
 };
 
-ModerationModule.GetSchedule = function (cbk) {
+ModerationModule.GetSchedule = function (matchid, cbk) {
     tournamentMatches
         .findOne({
             _id: matchid
@@ -377,6 +413,8 @@ ModerationModule.AddScheduleMatch = function (match, tournamentId, cbk) {
 
 
         var newMatch = new matches(matchTemplate);
+        newMatch.client = tournament.client;
+        newMatch.tournament = tournament;
         var tournamentMatch = new tournamentMatches();
         tournamentMatch.match = newMatch;
         tournamentMatch.client = tournament.client;
@@ -410,14 +448,14 @@ ModerationModule.ActivateMatch = function (id, state, cbk) {
     // Delete from database
     var match = ModerationModule.GetMatch(id);
     match.data.disabled = state;
-    scheduled_matches.findOneAndUpdate({ _id: id }, { $set: { disabled: state } }, cbk);
+    matches.findOneAndUpdate({ _id: id }, { $set: { disabled: state } }, cbk);
 };
 
 /**
  * Adds a new match to the schedule.
  */
 ModerationModule.UpdateScheduleMatch = function (match, cbk) {
-    scheduled_matches.findOneAndUpdate({ _id: match._id }, match, { upsert: true }, cbk);
+    matches.findOneAndUpdate({ _id: match._id }, match, { upsert: true }, cbk);
 };
 
 /**
@@ -425,9 +463,13 @@ ModerationModule.UpdateScheduleMatch = function (match, cbk) {
  */
 ModerationModule.RemoveScheduleMatch = function (id, cbk) {
     // Delete from database
-    ModerationModule.GetMatch(id).data.remove();
-    // Remove from list in memory
-    _.remove(ModerationModule.ModeratedMatches, { id: id });
+    const tmatch = ModerationModule.GetMatch(id);
+    
+    if (tmatch) {
+        tmatch.data.remove();
+        // Remove from list in memory
+        ModerationModule.RemoveFromLookup(id);
+    }
     cbk();
 };
 
@@ -436,51 +478,69 @@ ModerationModule.RemoveScheduleMatch = function (id, cbk) {
  */
 ModerationModule.updateMatchcronJobsInfo = function () {
     var itsNow = moment.utc();
-    matches
-        .find({
-            state: { $gt: -1 },
-            completed: { $ne: true },
-            $or: [{ 'moderation.0.type': 'rss-feed', 'moderation.0.active': true }, { 'moderation.1.type': 'rss-feed', 'moderation.1.active': true }]
-        }, '_id moderation')
-        .exec(function (err, matches) {
 
-            _.each(matches, function (match) {
-                var jobs = _.filter(scheduler.scheduledJobs, { name: match._id.toString() });
-                var matchInMemory = _.find(ModerationModule.ModeratedMatches, { id: match._id.toString() }); 
+    async.waterfall([
+        (cbk) => {
+            matches
+                .find({
+                    state: { $gt: -1 },
+                    completed: { $ne: true },
+                    $or: [{ 'moderation.0.type': 'rss-feed', 'moderation.0.active': true }, { 'moderation.1.type': 'rss-feed', 'moderation.1.active': true }]
+                })
+                .select('_id')
+                .exec(cbk);
+        },
+        (matches, cbk) => {
+            const matchObjectIds = _.map(matches, '_id');
+            tournamentMatches
+                .find({ match: { $in: matchObjectIds } })
+                .populate({ path: 'match', populate: [{ path: 'home_team', select: '-players' }, { path: 'away_team', select: '-players' }, { path: 'season' }] })
+                .exec(cbk);
+        }
+    ], function (err, trnMatches) {
+        async.each(trnMatches, function (trnMatch, cbk) {
+            const match = trnMatch.match;
+            const jobs = _.filter(scheduler.scheduledJobs, { name: match.id });
+            const matchInMemory = ModerationModule.GetMatch(trnMatch.id);
 
-                jobs.forEach(job => {
-                    if (job && job.nextInvocation()) {
-                        var duration = moment.duration(moment(job.nextInvocation()).diff(itsNow));
-                        var durationAsHours = duration.asMinutes();
-                        if (match.moderation[0].active) {
-                            match.moderation[0].start = "in " + durationAsHours.toFixed(2) + " minutes";
-                            match.moderation[0].scheduled = true;
-                        }
-                        if (match.moderation[1] && match.moderation[1].active) {
-                            match.moderation[1].start = "in " + durationAsHours.toFixed(2) + " minutes";
-                            match.moderation[1].scheduled = true;
-                        }
-                        log.info(`Match tick for ${matchInMemory ? matchInMemory.name + ' (' + match.id + ')' : match.id} will start in ${durationAsHours.toFixed(2)} minutes`);
-                    } else {
-                        // log.info("Match has not been picked up from scheduler");
-                        match.moderation[0].start = "";
-                        match.moderation[0].scheduled = false;
-                        if (match.moderation[1]) {
-                            match.moderation[1].start = "";
-                            match.moderation[1].scheduled = false;
-                        }
+            jobs.forEach(job => {
+                if (job && job.nextInvocation()) {
+                    var duration = moment.duration(moment(job.nextInvocation()).diff(itsNow));
+                    var durationAsHours = duration.asMinutes();
+                    if (match.moderation[0].active) {
+                        match.moderation[0].start = "in " + durationAsHours.toFixed(2) + " minutes";
+                        match.moderation[0].scheduled = true;
                     }
-                    match.save(function (er, re) {
-                        if (matchInMemory) {
-                            matchInMemory.data.moderation[0].start = re.moderation[0].start;
-                            matchInMemory.data.moderation[0].scheduled = re.moderation[0].scheduled;
-                            // console.log("changed " +matchInMemory.data.moderation[0].start);                
-                        }
-                    });
-                });
-
+                    if (match.moderation[1] && match.moderation[1].active) {
+                        match.moderation[1].start = "in " + durationAsHours.toFixed(2) + " minutes";
+                        match.moderation[1].scheduled = true;
+                    }
+                    log.info(`Match tick for ${matchInMemory ? matchInMemory.name + ' (' + match.id + ')' : match.id} will start in ${durationAsHours.toFixed(2)} minutes`);
+                } else {
+                    // log.info("Match has not been picked up from scheduler");
+                    match.moderation[0].start = "";
+                    match.moderation[0].scheduled = false;
+                    if (match.moderation[1]) {
+                        match.moderation[1].start = "";
+                        match.moderation[1].scheduled = false;
+                    }
+                }
             });
+            match.save(function (er, re) {
+                if (matchInMemory) {
+                    matchInMemory.data.moderation[0].start = re.moderation[0].start;
+                    matchInMemory.data.moderation[0].scheduled = re.moderation[0].scheduled;
+                    // console.log("changed " +matchInMemory.data.moderation[0].start);       
+                }
+                return cbk(null);
+            });
+        }, (asyncErr) => {
+            if (asyncErr)
+                log.error(`[ModerationModule] Error while updating match schedules in updateMatchcronJobsInfo: ${asyncErr.stack}`);
         });
+    });
+
+
 }
 
 
@@ -488,6 +548,9 @@ ModerationModule.matchStartWatcher = function () {
     try {
         var now = moment.utc();
         var fifteenMinsAfterNow = now.clone().add(16, 'm').toDate();
+
+        const PushNotifications = require('../messaging-tools/PushNotifications');
+
         matches
             .find({
                 state: { $gt: -1 },
@@ -506,317 +569,63 @@ ModerationModule.matchStartWatcher = function () {
                     var mStart = moment.utc(m.start);
                     return now.isAfter(mStart.clone().subtract(16, 'm')) && now.isBefore(mStart.clone().subtract(15, 'm')) ? true : false;
                 });
-                if (matchesStartingInNext15.length == 0)
+                if (matchesStartingInNext15.length === 0)
                     return;
-                var userGamecards = mongoose.models.userGamecards;
 
-                async.waterfall([
-                    function (cbk) {
-                        return users.find({}, '_id', cbk);
-                    },
-                    function (allUsers, cbk) {
-
-                        var allUserIds = _.map(allUsers, 'id');
-
-                        if (matchesStartingInNext15.length === 0)
-                            return async.setImmediate(() => { cbk(null, allUserIds); });
-                        else {
-                            // We have at least a match starting in the next 5 mins
-                            // Irrespectively of which ones, find all userIds that did not play a card in the last 5, 10, 20 consecutive matches
-
-                            var now = new Date();
-
-                            return async.waterfall([
-                                function (innerCbk) {
-
-                                    // Find the last 5, 10 and 20 matches
-
-                                    return matches
-                                        .find({
-                                            completed: true,
-                                            start: { $lt: now }
-                                        }, '_id start')
-                                        .sort({ start: -1 })
-                                        .limit(20)
-                                        .exec(innerCbk);
-                                },
-                                function (lastMatches, innerCbk) {
-                                    var lastTwentyMatchesIds = _.map(lastMatches, 'id');
-                                    var lastTenMatchesIds = _.take(lastTwentyMatchesIds, 10);
-                                    var lastFiveMatchesIds = _.take(lastTwentyMatchesIds, 5);
-
-                                    var tenDaysBefore = moment.utc(now).subtract(10, 'd').toDate();
-
-                                    // and for these matches get all users having played a gamecard.
-
-                                    async.parallel([
-                                        function (innermostCbk) {
-                                            userGamecards.find({
-                                                matchid: { $in: lastTwentyMatchesIds }
-                                            }, 'userid', innermostCbk);
-                                        },
-                                        function (innermostCbk) {
-                                            userGamecards.find({
-                                                matchid: { $in: lastTenMatchesIds }
-                                            }, 'userid', innermostCbk);
-                                        },
-                                        function (innermostCbk) {
-                                            userGamecards.find({
-                                                matchid: { $in: lastFiveMatchesIds }
-                                            }, 'userid', innermostCbk);
-                                        },
-                                        function (innermostCbk) {
-                                            //userGamecards.find({
-                                            //    creationTime: { gt: tenDaysBefore },
-                                            //}, 'userid', innermostCbk);
-                                            userGamecards.aggregate([
-                                                {
-                                                    $match: {
-                                                        creationTime: { $gt: tenDaysBefore }
-                                                    }
-                                                },
-                                                {
-                                                    $group: {
-                                                        _id: '$userid'
-                                                    }
-                                                }
-                                            ], innermostCbk);
-                                        },
-                                        function (innermostCbk) {
-                                            mongoose.models.scores.aggregate([
-                                                {
-                                                    $match: {
-                                                        lastActive: { $gt: tenDaysBefore }
-                                                    }
-                                                },
-                                                {
-                                                    $group: {
-                                                        _id: '$user_id',
-                                                        totalScore: { $max: '$score' }
-                                                    }
-                                                },
-                                                {
-                                                    $match: {
-                                                        $or: [{ totalScore: 0 }, { totalScore: null }]
-                                                    }
-                                                }
-                                            ], innermostCbk);
-                                        },
-                                        function (innermostCbk) {
-                                            mongoose.models.gameserversettings.findOne({}, innermostCbk);
-                                        }
-                                    ], function (err, gamecardResults) {
-                                        if (err) {
-                                            log.error('Failed to send notifications 15\' prior of match start: ' + err);
-                                            return innerCbk(null, [], []);
-                                        }
-
-                                        // Then subtract their ids from allUserIds and get those that have not played a card in these consecutive matches
-                                        // Then send them a message
-
-                                        var lastTwentyMatchesUsers = gamecardResults[0];
-                                        var lastTenMatchesUsers = gamecardResults[1];
-                                        var lastFiveMatchesUsers = gamecardResults[2];
-                                        var lastTenDaysCardUsers = gamecardResults[3];
-                                        var lastTenDaysMatchVisitors = gamecardResults[4];
-                                        var pushNotifications = gamecardResults[5].pushNotifications;
-
-                                        var userIdsNotHavingPlayedLastTwentyMatches = [];
-                                        var userIdsNotHavingPlayedLastTenMatches = [];
-                                        var userIdsNotHavingPlayedLastFiveMatches = [];
-                                        var userIdsNotHavingPlayedLastTenDays = [];
-
-                                        if (lastTwentyMatchesUsers && lastTwentyMatchesUsers.length > 0) {
-                                            var lastTwentyMatchesUserIds = _.uniq(_.map(lastTwentyMatchesUsers, 'userid'));
-                                            userIdsNotHavingPlayedLastTwentyMatches = _.difference(allUserIds, lastTwentyMatchesUserIds);
-                                        }
-                                        if (lastTenMatchesUsers && lastTenMatchesUsers.length > 0) {
-                                            var lastTenMatchesUserIds = _.uniq(_.map(lastTenMatchesUsers, 'userid'));
-                                            userIdsNotHavingPlayedLastTenMatches = _.difference(allUserIds, lastTenMatchesUserIds);
-                                        }
-                                        if (lastFiveMatchesUsers && lastFiveMatchesUsers.length > 0) {
-                                            var lastFiveMatchesUserIds = _.uniq(_.map(lastFiveMatchesUsers, 'userid'));
-                                            userIdsNotHavingPlayedLastFiveMatches = _.difference(allUserIds, lastFiveMatchesUserIds);
-                                        }
-                                        if (lastTenDaysMatchVisitors && lastTenDaysMatchVisitors.length > 0) {
-                                            userIdsNotHavingPlayedLastTenDays = _.map(lastTenDaysMatchVisitors, '_id');
-                                        }
-                                        if (lastTenDaysCardUsers && lastTenDaysCardUsers.length > 0) {
-                                            var lastTenDaysUserIds = _.uniq(_.map(lastTenDaysCardUsers, 'userid'));
-                                            userIdsNotHavingPlayedLastTenDays = _.difference(userIdsNotHavingPlayedLastTenDays, lastTenDaysUserIds);
-                                        }
-
-                                        userIdsNotHavingPlayedLastTenMatches = _.difference(userIdsNotHavingPlayedLastTenMatches, userIdsNotHavingPlayedLastTwentyMatches);
-                                        userIdsNotHavingPlayedLastFiveMatches = _.difference(userIdsNotHavingPlayedLastFiveMatches, userIdsNotHavingPlayedLastTwentyMatches);
-                                        userIdsNotHavingPlayedLastFiveMatches = _.difference(userIdsNotHavingPlayedLastFiveMatches, userIdsNotHavingPlayedLastTenMatches);
-                                        userIdsNotHavingPlayedLastTenDays = _.difference(userIdsNotHavingPlayedLastTenDays, userIdsNotHavingPlayedLastTwentyMatches);
-                                        userIdsNotHavingPlayedLastTenDays = _.difference(userIdsNotHavingPlayedLastTenDays, userIdsNotHavingPlayedLastTenMatches);
-                                        userIdsNotHavingPlayedLastTenDays = _.difference(userIdsNotHavingPlayedLastTenDays, userIdsNotHavingPlayedLastFiveMatches);
-
-                                        var matchId = matchesStartingInNext15[0].id;
-
-                                        var matchName = { en: '', ar: '' };
-
-                                        if (matchesStartingInNext15[0].home_team && matchesStartingInNext15[0].home_team.name && matchesStartingInNext15[0].home_team.name.en)
-                                            matchName.en += matchesStartingInNext15[0].home_team.name.en;
-                                        else matchName.en += 'Home team';
-                                        matchName.en += ' - ';
-                                        if (matchesStartingInNext15[0].away_team && matchesStartingInNext15[0].away_team.name && matchesStartingInNext15[0].away_team.name.en)
-                                            matchName.en += matchesStartingInNext15[0].away_team.name.en;
-                                        else matchName.en += 'Away team';
-
-                                        if (matchesStartingInNext15[0].home_team && matchesStartingInNext15[0].home_team.name && matchesStartingInNext15[0].home_team.name.ar)
-                                            matchName.ar += matchesStartingInNext15[0].home_team.name.ar;
-                                        else matchName.ar += 'Home team';
-                                        matchName.ar += ' - ';
-                                        if (matchesStartingInNext15[0].away_team && matchesStartingInNext15[0].away_team.name && matchesStartingInNext15[0].away_team.name.ar)
-                                            matchName.ar += matchesStartingInNext15[0].away_team.name.ar;
-                                        else matchName.ar += 'Away team';
-
-                                        if (pushNotifications && pushNotifications.R4 && userIdsNotHavingPlayedLastTwentyMatches.length > 0) {
-                                            log.info(`Sending reactivation R4 notification to ${userIdsNotHavingPlayedLastTwentyMatches.length} users: ${_.take(userIdsNotHavingPlayedLastTwentyMatches, 9)}, ...`);
-                                            var msg = {
-                                                en: `${matchName.en} kicks off in 15'! Start playing your cards NOW & make it on the leaderboard!`,
-                                                ar: `مباراة ${matchName.ar} ستبدأ في 15دقيقة!
-ابدأ بالعب بطاقاتك الآن وقد تكون المتصدر على قائمة المتسابقين!`
-                                            };
-                                            MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastTwentyMatches, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
-                                        }
-                                        if (pushNotifications && pushNotifications.R3 && userIdsNotHavingPlayedLastTenMatches.length > 0) {
-                                            log.info(`Sending reactivation R3 notification to ${userIdsNotHavingPlayedLastTenMatches.length} users: ${_.take(userIdsNotHavingPlayedLastTenMatches, 9)}, ...`);
-                                            var msg = { 
-												en: `Your name is missing from the leaderboard! Find a match you like and play your cards right 👍` ,
-												ar: `اسمك غير موجود على قائمة المتصدرين! اختر مباراة تعجبك والعب بطاقاتك!`
-											};
-                                            MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastTenMatches, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
-                                        }
-                                        if (pushNotifications && pushNotifications.R2 && userIdsNotHavingPlayedLastFiveMatches.length > 0) {
-                                            log.info(`Sending reactivation R2 notification to ${userIdsNotHavingPlayedLastFiveMatches.length} users: ${_.take(userIdsNotHavingPlayedLastFiveMatches, 9)}, ...`);
-                                            var msg = { 
-												en: `Where have you been champ? Join the ${matchName.en} and prove you know your stuff!` ,
-												ar: `أين كنت يا بطل؟ شارك بمباراة ${matchName.ar} لتثبت أنك خبير باللعبة!`
-											};
-                                            MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastFiveMatches, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
-                                        }
-                                        if (pushNotifications && pushNotifications.R1 && userIdsNotHavingPlayedLastTenDays.length > 0) {
-                                            log.info(`Sending reactivation R1 notification to ${userIdsNotHavingPlayedLastTenDays.length} users: ${_.take(userIdsNotHavingPlayedLastTenDays, 9)}, ...`);
-                                            var msg = { 
-												en: `️⚽ ${matchName.en} is starting in 15'! Can you to rank in the top-10? Join the game and see!` ,
-												ar: `مباراة  ${matchName.ar} ستبدأ في 15دقيقة!
-هل ستكون مع أفضل 10؟ شارك باللعب لتعرف!`
-											};
-                                            MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastTenDays, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
-                                        }
-
-                                        return innerCbk(null);
-                                    });
-                                }
-                            ], (err) => {
-                                if (err)
-                                    log.error(err.stack);
-
-                                return cbk(null, allUserIds);
-                            });
-                        }
-                    }//,
-                    //function (allUserIds, cbk) {
-                    //    if (matchesStartingInNext30.length == 0)
-                    //        return async.setImmediate(() => { cbk(null, allUserIds); });
-                    //    else {
-                    //        // Find all user ids having logged in after X = 30 days
-                    //        var lastLoginThreshold = moment.utc().subtract(30, 'd').toDate();
-                    //        users.find({ lastLoginAt: { $gt: lastLoginThreshold } }, '_id', function (userErr, frequentUsers) {
-                    //            if (userErr) {
-                    //                log.error(userErr.stack);
-                    //                return cbk(null);
-                    //            }
-
-                    //            if (frequentUsers && frequentUsers.length > 0) {
-                    //                var frequentUserIds = _.map(frequentUsers, 'id');
-                    //                // Now invert these users and get all users NOT having logged in the last X days
-                    //                var infrequentUserIds = _.difference(allUserIds, frequentUserIds);
-                    //                if (infrequentUserIds.length > 0) {
-                    //                    var msgToUsersNotHavingLoggedIn = `We miss you! Play your cards right and climb the leaderboard`;
-                    //                    MessagingTools.sendPushToUsers(infrequentUserIds, { en: msgToUsersNotHavingLoggedIn }, { "type": "view", "data": { "view": "match", "viewdata": matchesStartingInNext30[0].id } }, "all");
-                    //                }
-                    //                else
-                    //                    return cbk(null);
-                    //            }
-                    //            else
-                    //                return cbk(null);
-                    //        });
-                    //    }
-                    //}
-                ]);
+                return PushNotifications.Reactivation(matchesStartingInNext15, () => { });
             });
     }
     catch (err) {
         log.error(err);
     }
-}
+};
 
 function initModule(callback) {
-    if (!this.mock) {
-        /* We load all scheduled/active matches from DB on server initialization */
 
-        async.waterfall([
-            (cbk) => {
-                matches
-                    .find({
-                        state: { $gt: -1 },
-                        completed: { $ne: true }
-                    })
-                    .select('_id')
-                    .exec(cbk);
-            },
-            (matches, cbk) => {
-                const matchObjectIds = _.map(matches, '_id');
-                tournamentMatches
-                    .find({ match: { $in: matchObjectIds } })
-                    .populate({ path: 'match', populate: [{ path: 'home_team' }, { path: 'away_team' }, { path: 'competition' }] })
-                    .exec(cbk);
-            }
-        ], function (err, trnMatches) {
-            if (err)
-                return callback ? callback(err) : log.error(err);
+    /* We load all scheduled/active matches from DB on server initialization */
 
-            if (trnMatches) {
+    async.waterfall([
+        (cbk) => {
+            matches
+                .find({
+                    state: { $gt: -1 },
+                    completed: { $ne: true }
+                })
+                .select('_id')
+                .exec(cbk);
+        },
+        (matches, cbk) => {
+            const matchObjectIds = _.map(matches, '_id');
+            tournamentMatches
+                .find({ match: { $in: matchObjectIds } })
+                .populate({ path: 'match', populate: [{ path: 'home_team', select: '-players' }, { path: 'away_team', select: '-players' }, { path: 'season' }] })
+                .exec(cbk);
+        }
+    ], function (err, trnMatches) {
+        if (err)
+            return callback ? callback(err) : log.error(err);
 
-                // Adding wait index of 1sec in order to bypass the limitation of STATS that prevents overload of calls
-                var waitIndex = 0;
+        if (trnMatches) {
 
-                /*For each match found we hook platform specific functionality and add it to the main list*/
-                _.forEach(trnMatches, function (tmatch) {
-                    setTimeout(function () {
-                        var hookedMatch = new match_module(tmatch.match, shouldInitAutoFeed);
-                        ModerationModule.ModeratedMatches.push(hookedMatch);
-                        log.info("[Moderation] Found match with ID [" + hookedMatch.id + "]. Creating match instance");
-                    }, 2000 * waitIndex);
-                    waitIndex++;
-                });
-            } else {
-                log.warn("No scheduled matches could be found in the database.");
-            }
+            // Adding wait index of 1sec in order to bypass the limitation of STATS that prevents overload of calls
+            var waitIndex = 0;
 
-            // Callback we are done for whomever needs it
-            if (callback !== null)
-                callback();
-        });
+            /*For each match found we hook platform specific functionality and add it to the main list*/
+            _.forEach(trnMatches, function (tournamentMatch) {
+                setTimeout(function () {
 
-
-    } else {
-
-
-        var match = new scheduled_matches(mockMatch);
-
-        var hookedMatch = new match_module(match);
-        this.ModeratedMatches.push(hookedMatch);
-        log.info("Mock match created with ID [" + hookedMatch.id + "].");
+                    const hookedMatch = ModerationModule.InsertInLookup(tournamentMatch);
+                }, 2000 * waitIndex);
+                waitIndex++;
+            });
+        } else {
+            log.warn("No scheduled matches could be found in the database.");
+        }
 
         // Callback we are done for whomever needs it
-        if (callback != null)
+        if (callback !== null)
             callback();
-    }
+    });
 
     // Here we will create a job in interval where we check for feed matches, if theit timers are set and update accordingly the time until initiation
     ModerationModule.cronJobsUpdateInterval = setInterval(ModerationModule.updateMatchcronJobsInfo, 60000);
@@ -824,7 +633,7 @@ function initModule(callback) {
     // Here we create a job executed in 5min intervals, that will send the notifications: 
     // The match is about to start 15 mins before the start, and 2 reactivation motivations 5 mins before the start
     ModerationModule.matchStartNotificationInterval = setInterval(ModerationModule.matchStartWatcher, 60 * 1000);
-};
+}
 
 // A Mock Match object in case we need it for testing
 var mockMatch = require('./mocks/mock-match');

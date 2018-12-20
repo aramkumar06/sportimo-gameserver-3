@@ -2,51 +2,33 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    item = mongoose.models.scheduled_matches,
+    item = mongoose.models.trn_matches,
     competition = mongoose.models.competitions,
     settings = mongoose.models.settings,
     defaultMatch = require('../config/empty-match'),
-    MatchModeration = require('../../match-moderation'),
     logger = require('winston'),
     api = {};
 
-//var MessagingTools = require.main.require('./sportimo_modules/messaging-tools');
 
 api.items = function (req, res) {
 
     var skip = null, limit = null;
-    //  publishDate: { $gt: req.body.minDate, $lt: req.body.maxDate }, type: req.body.type, tags: { "$regex": req.body.tags, "$options": "i" }
-    var queries = {};
     var userCountry = req.params.country;
 
-
-    var q = item.find({ disabled:{$ne:true}, $or: [{ visiblein: userCountry }, { visiblein: { $exists: false } }, { visiblein: { $size: 0 } }] });
-
-    q.populate('home_team', 'name logo')
-        .populate('away_team', 'name logo')
-        .populate('competition', 'name logo graphics');
-
-    q.select('home_team home_score away_team away_score competition time state start completed');
-    q.sort({ start: -1 });
-    q.limit(50);
-    q.exec(function (err, items) {
-        // items = _.remove(items, function (o) {
-        //     return o.home_team == null || o.away_team == null;
-        // })
-
-        // items.forEach(function (o) {
-        //     o.remove(function (err, data) {
-        //         if (!err) {
-        //             console.log("Removed: " + o._id);
-        //         } else {
-        //             return res.status(500).json(err);
-        //         }
-        //     });
-        // });
+    item
+        .find({ hidden: { $ne: true }, $or: [{ visibleInCountries: userCountry }, { visibleInCountries: null }, { visibleInCountries: [] }] })
+        .populate({
+            path: 'match',
+            match: { disabled: { $ne: true }, $or: [{ visiblein: userCountry }, { visiblein: { $exists: false } }, { visiblein: { $size: 0 } }] },
+            select: 'home_team home_score away_team away_score competition time state start completed',
+            populate: [{ path: 'home_team', select: 'name logo' }, { path: 'away_team', select: 'name logo' }, { path: 'competition' }]
+        })
+        .sort({ 'match.start': -1 })
+        .limit(50)
+    .exec( (err, items) => {
 
         return res.send(items);
     });
-
 };
 
 
@@ -109,7 +91,7 @@ api.additem = function (req, res) {
     req.body.timeline.push({
         timed: false,
         text: { en: "Pre Game", ar: "ماقبل المباراة" }
-    })
+    });
 
     competition.findById(req.body.competition).then(function (competition) {
 
@@ -155,6 +137,8 @@ api.additem = function (req, res) {
                     logger.log('error', err.stack, req.body);
                     return res.status(500).json(err);
                 } else {
+                    const MatchModeration = require('../../match-moderation');
+
                     MatchModeration.LoadMatchFromDB(data._id, function () {
                         return res.status(200).json(data);
                     });

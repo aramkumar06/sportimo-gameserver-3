@@ -11,20 +11,22 @@ else {
         client: { type: ObjectId, ref: 'trn_clients' },
         tournament: { type: ObjectId, ref: 'tournaments' },
         tournamentMatch: { type: ObjectId, ref: 'trn_matches' },
-        competition: { type: ObjectId, ref: 'competitions' },
-        scheduledMatch: { type: ObjectId, ref: 'scheduled_matches' },
+        competitionSeason: { type: ObjectId, ref: 'trn_competition_seasons' },
+
+        game_id: { type: String, ref: 'matches' },
+        match_date: { type: Date },
 
         // Existing fields
-        user: { type: ObjectId, ref: 'users' },
-        userName: { type: String },
-        //pic: { type: String },
-        //level: { type: Number, default: 0 },
-        //country: { type: String },
+        user_id: { type: String, ref: 'users' },
+        pic: { type: String },
+        user_name: { type: String },
+        country: { type: String },
+        level: { type: Number, default: 0 },
 
         score: { type: Number, default: 0 },
         scoreDate: { type: Date },
-
-        //prize_eligible: Boolean,
+        //isPrizeEligible: 
+        //prize_eligible: { type: Boolean, default: false },,
 
         created: { type: Date, default: Date.now },
         lastActive: { type: Date }
@@ -41,8 +43,8 @@ else {
 
     scoreSchema.statics.AddPoints = function (uid, room, points, m_date, cb) {
 
-        return mongoose.model('trn_scores').findOneAndUpdate({ tournamentMatch: new ObjectId(room), user: new ObjectId(uid) },
-            { $inc: { score: points }, scoreDate: m_date },
+        return mongoose.model('trn_scores').findOneAndUpdate({ tournamentMatch: room, user_id: uid },
+            { $inc: { score: points }, match_date: m_date },
             { upsert: true, new: true },
             function (err, result) {
                 if (err) {
@@ -52,7 +54,7 @@ else {
                 }
 
                 // Safe guard empty leaderboard [SPI-282]
-                if (!result.userName) {
+                if (!result.user_name) {
 
                     mongoose.model('users').findById(uid, function (err, user) {
                         if (err) {
@@ -68,15 +70,11 @@ else {
                             }
                             else {
                                 var score = {
-                                    userName: user.username
-                                    //pic: user.picture,
-                                    //country: user.country
+                                    user_name: user.username
                                 };
-                                //if (user.level)
-                                //    score.level = user.level;
 
                                 if (user) {
-                                    mongoose.model('scores').findOneAndUpdate({ tournamentMatch: new ObjectId(room), user: new ObjectId(uid) },
+                                    mongoose.model('scores').findOneAndUpdate({ tournamentMatch: room, user_id: uid },
                                         score,
                                         { upsert: true, safe: true, new: true },
                                         function (err, result) {
@@ -102,13 +100,10 @@ else {
     scoreSchema.statics.AddLeaderboardEntry = function (uid, room) {
         mongoose.model('users').findById(uid, function (err, user) {
             if (user) {
-                mongoose.model('trn_scores').findOneAndUpdate({ tournamentMatch: new ObjectId(room), user: new ObjectId(uid) },
+                mongoose.model('trn_scores').findOneAndUpdate({ tournamentMatch: room, user_id: uid },
                     {
-                        user: user._id,
-                        //pic: user.picture,
-                        //user_name: user.username,
-                        tournamentMatch: new ObjectId(room)
-                        //country: user.country
+                        user_id: user.id,
+                        tournamentMatch: room
                     },
                     { upsert: true },
                     function (err, result) {

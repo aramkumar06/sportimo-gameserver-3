@@ -2,16 +2,16 @@
 var mongoose = require('mongoose');
 //mongodb://devuser:3rgfgWERg34g34wFE45634eg3g5HAH34t3qrtSREGSE345s5sghstGw45gsg45wtsbtSRHw4g5-sergse3245-aerg345@46.101.100.145:27017/dev
 var config = {
-//   "db": "sportimov2",  
-//   "host": "ds027835.mongolab.com",  
-//   "user": "bedbug",
-//   "pw": "a21th21",
-//   "port": "27835"
-   "db": "sportimo2?replicaSet=rs-ds021165",  
-   "host": "ds021165-a0.mlab.com",  
+   "db": "sportimo_development",  
+   "host": "ds127550-a1.mlab.com",  
    "user": "bedbug",
    "pw": "a21th21",
-   "port": "21165"
+   "port": "27550"
+   //"db": "sportimo2?replicaSet=rs-ds021165",  
+   //"host": "ds021165-a0.mlab.com",  
+   //"user": "bedbug",
+   //"pw": "a21th21",
+   //"port": "21165"
 //      "db": "sportimo_mbc",  
 //    "host": "ds059726-a0.mlab.com",  
 //    "user": "bedbug",

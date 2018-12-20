@@ -154,14 +154,14 @@ var PublishChannel = null;
 var SubscribeChannel = null;
 
 try {
-    PublishChannel = redis.createClient(process.env.REDIS_URL || "redis://h:pa4daaf32cd319fed3e9889211b048c2dabb1f723531c077e5bc2b8866d1a882e@ec2-34-247-112-146.eu-west-1.compute.amazonaws.com:6799");
+    PublishChannel = redis.createClient(process.env.REDIS_URL || "redis://h:pa4daaf32cd319fed3e9889211b048c2dabb1f723531c077e5bc2b8866d1a882e@ec2-63-32-222-217.eu-west-1.compute.amazonaws.com:6469");
     // PublishChannel.auth(redisCreds.secret, function (err) {
     //     if (err) {
     //         console.log(err);
     //     }
     // });
 
-    SubscribeChannel = redis.createClient(process.env.REDIS_URL || "redis://h:pa4daaf32cd319fed3e9889211b048c2dabb1f723531c077e5bc2b8866d1a882e@ec2-34-247-112-146.eu-west-1.compute.amazonaws.com:6799");
+    SubscribeChannel = redis.createClient(process.env.REDIS_URL || "redis://h:pa4daaf32cd319fed3e9889211b048c2dabb1f723531c077e5bc2b8866d1a882e@ec2-63-32-222-217.eu-west-1.compute.amazonaws.com:6469");
     // SubscribeChannel.auth(redisCreds.secret, function (err) {
     //     if (err) {
     //         console.log(err);
@@ -235,16 +235,11 @@ try {
 
     var leaderboards_module = require('./sportimo_modules/leaderpay');
 
-    var questions_module = require('./sportimo_modules/questions');
-
-
     var users_module = require('./sportimo_modules/users');
 
     var data_module = require('./sportimo_modules/data-module');
 
     var polls_module = require('./sportimo_modules/polls');
-
-    var early_access_module = require('./sportimo_modules/early-access');
 }
 catch (err) {
     console.log(err);

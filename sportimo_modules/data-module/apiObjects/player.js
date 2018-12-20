@@ -1,7 +1,11 @@
+'use strict';
+
+
 // Module dependencies.
 var mongoose = require('mongoose'),
     _ = require('lodash'),
-  Player = mongoose.models.players,
+  Player = mongoose.models.trn_players,
+  Team = mongoose.models.trn_teams,
   api = {},
   l = require('../config/lib');
 
@@ -12,7 +16,7 @@ var mongoose = require('mongoose'),
 */
 
 // ALL
-api.getAllPlayers = function (skip, limit, cb) {
+api.getAll = function (skip, limit, cb) {
   var q = Player.find();
 
   if (skip != undefined)
@@ -28,75 +32,131 @@ api.getAllPlayers = function (skip, limit, cb) {
 
 
 // Returns results matching the searchTerm
-api.searchPlayers = function (searchTerm, teamId, cb) {
-    var query = { $or: [{ 'name.en': new RegExp(searchTerm, 'i') }, { $text: { $search: searchTerm } }] };
-    if (teamId)
-        query.teamId = teamId;
+api.search = function (searchTerm, teamId, cb) {
 
-    Player.find(query)
-        .populate('teamId', '_id name parserids logo')
-        .limit(100)
-        .exec(function (err, players) {
-            var playersDto = [];
-            _.forEach(players, (player) => {
-                var playerDto = player.toObject();
-                if (playerDto.teamId && playerDto.teamId.name && playerDto.teamId.name.en)
-                    playerDto.team = playerDto.teamId.name.en;
-                playerDto.type = 'player';
-                playersDto.push(playerDto);
+    const searchExp = new RegExp(searchTerm, 'i');
+    let playersDto = [];
+
+    var query = {
+        $or: [
+            { 'name.en': searchExp },
+            { 'name.ar': searchExp },
+            { 'shortName.en': searchExp },
+            { 'shortName.ar': searchExp },
+            { 'abbr': searchExp },
+            { 'position': searchExp }
+            //{ $text: { $search: searchTerm } }
+        ]
+    };
+    if (teamId) {
+        Team
+            .findOne({ _id: teamId })
+            .populate({ path: 'players', match: query })
+            .exec((err, team) => {
+                if (err)
+                    return cb(err);
+
+                if (!team)
+                    return cb(null, []);
+
+                const teamName = team.name && team.name.en ? team.name.en : null;
+
+                const players = team.players;
+                _.forEach(players, (player) => {
+                    var playerDto = player.toObject();
+                    if (teamName)
+                        playerDto.team = teamName;
+                    playerDto.type = 'player';
+                    playersDto.push(playerDto);
+                });
+                return cbf(cb, err, playersDto);
+
             });
-            return cbf(cb, err, playersDto);
-        });
-}
+    }
+    else {
+        Player
+            .find(query)
+            .limit(100)
+            .exec(function (err, players) {
+                _.forEach(players, (player) => {
+                    var playerDto = player.toObject();
+                    playerDto.type = 'player';
+                    playersDto.push(playerDto);
+                });
+                return cbf(cb, err, playersDto);
+            });
+    }
 
-api.getPlayersByTeam = function (teamid, cb) {
-  var q = Player.find({ teamId: teamid });
-  
-  q.select('name position');
-  
-  return q.exec(function (err, players) {
-    cbf(cb, err, players);
-  });
+};
+
+api.getByTeam = function (teamid, cb) {
+
+    Team
+        .findOne({ _id: teamId })
+        .populate({ path: 'players', match: query, select: 'name position' })
+        .exec((err, team) => {
+            if (err)
+                return cb(err);
+
+            if (!team)
+                return cb(null, []);
+
+            const teamName = team.name && team.name.en ? team.name.en : null;
+
+            const players = team.players;
+            return cbf(cb, err, players);
+
+        });
+
 };
 
 // GET
-api.getPlayer = function (id, cb) {
+api.getById = function (id, cb) {
 
-  var q = Player.findOne({ '_id': id });
+    var q = Player.findOne({ '_id': id });
 
-  return q.exec(function (err, players) {
-    cbf(cb, err, players);
-  });
+    return q.exec(function (err, player) {
+        cbf(cb, err, player);
+    });
 };
 
-// POST
-api.addPlayer = function (player, cb) {
 
-  if (player == 'undefined') {
-    cb('No Player Provided. Please provide valid player data.');
-  }
-  player = new Player(player);
-  player.save(function (err) {
-    cbf(cb, err, player.toObject());
-  });
+api.getTeams = function (id, cb) {
+    Team
+        .findOne({ players: id })
+        .exec((err, teams) => {
+            cbf(cb, err, teams);
+        });
+};
+
+
+// POST
+api.add = function (player, cb) {
+
+    if (!player) {
+        cb('No Player Provided. Please provide valid player data.');
+    }
+
+    player = new Player(player);
+    player.save(function (err) {
+        cbf(cb, err, player);
+    });
 };
 
 // PUT
-api.editPlayer = function (id, updateData, cb) {
-  return Player.findByIdAndUpdate(id, updateData,function (err, player) {
+api.edit = function (id, updateData, cb) {
 
- cbf(cb, err, player.toObject());
-
-
-    
-  });// eo player.find
+    return Player.findByIdAndUpdate(id, { $set: updateData }, function (err, player) {
+        cbf(cb, err, player);
+    });
 };
 
 // DELETE
-api.deletePlayer = function (id, cb) {
-  return Player.findById(id).remove().exec(function (err, player) {
-    return cbf(cb, err, true);
-  });
+api.delete = function (id, cb) {
+
+    return Player.findById(id).remove().exec(function (err, player) {
+        return cbf(cb, err, true);
+    });
 };
 
 
@@ -107,14 +167,14 @@ api.deletePlayer = function (id, cb) {
 
 //TEST
 api.test = function (cb) {
-  cbf(cb, false, { result: 'ok' });
+    cbf(cb, false, { result: 'ok' });
 };
 
 
-api.deleteAllPlayers = function (cb) {
-  return Player.remove({}, function (err) {
-    cbf(cb, err, true);
-  });
+api.deleteAll = function (cb) {
+    return Player.remove({}, function (err) {
+        cbf(cb, err, true);
+    });
 };
 
 

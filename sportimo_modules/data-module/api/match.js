@@ -2,7 +2,7 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    Matches = mongoose.models.scheduled_matches,
+    Matches = mongoose.models.trn_matches,
     Questions = mongoose.models.questions,
     Answers = mongoose.models.answers,
     Scores = mongoose.models.scores,
@@ -248,7 +248,7 @@ var TranslateUserGamecard = function (userGamecard) {
 // POST
 api.updateHeadToHead = function (req, res) {
 
-    if (req.body == 'undefined') {
+    if (req.body === 'undefined') {
         return res.status(400).json('No item Provided. Please provide valid team data.');
     }
 

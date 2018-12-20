@@ -22,7 +22,7 @@ var path = require('path'),
     winston = require('winston'),
     _ = require('lodash'),
     async = require('async');
-var ObjectId = mongoose.Schema.Types.ObjectId;
+//var ObjectId = mongoose.Schema.Types.ObjectId;
 
 var log = new (winston.Logger)({
     levels: {

@@ -9,8 +9,8 @@ if (mongoose.models.trn_playerstats)
     module.exports = mongoose.models.trn_playerstats;
 else {
     var playerStats = {
-        competition: { type: ObjectId, ref: 'competitions' },
-        season: { type: Schema.Types.Mixed },
+        competition: { type: ObjectId, ref: 'trn_competitions' },
+        season: { type: ObjectId, ref: 'trn_competition_seasons' },
         team: { type: ObjectId, ref: 'trn_teams' },
         player: { type: ObjectId, ref: 'trn_players' },
 

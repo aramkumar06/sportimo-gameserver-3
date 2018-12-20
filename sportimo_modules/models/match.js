@@ -67,10 +67,8 @@ else {
         },
         start: Date,
         color: String,
-        competition: {
-            type: ObjectId,
-            ref: 'competitions'
-        },
+        competition: { type: ObjectId, ref: 'trn_competitions' },
+        season: { type: ObjectId, ref: 'trn_competition_seasons' },
         name: String,   // a match name generated from team names, mainly for tracing and debugging reasons
         disabled: { type: Boolean, default: true },
         donttouch: Boolean,

@@ -69,12 +69,14 @@ var competitionId = "56f4800fe4b02f2226646297";	// Premier League
 //var competitionId = "5bbd9d4ac7cc110d8f3979e8";	// International Friendlies
 
 
+var seasonId = null; // default season, get the latest one for the given competition id
+
 if (competitionId) {
     try {
         setTimeout(() => {
             //statscore.UpdateTeamPlayersCareerStats("588a8d890bb50f00feda8dbe", 29362, (err, playersUpdated) => {
             //statscore.TestGuruStats((err) => {
-            statscore.UpdateTeams(competitionId, (err, result) => {
+            statscore.UpdateTeams(competitionId, seasonId, (err, result) => {
                 //statscore.UpdateAllCompetitionStats(competitionId, 2018, (err, result) => {
                 //stats.UpdateAllCompetitionStats(competitionId, 2017, (err, result) => {
                 //statscore.UpdateLeagueStandings(null, competitionId, 2018, (err, result) => {

@@ -14,17 +14,17 @@ Handler = { Reward: {} };
  * at the end of the game.
  */
 Handler.Reward.persist_gamer = function (matchid, callback) {
-    mongoose.models.useractivities.find({ room: matchid, isPresent: true })
-        .exec(function (err, users) {
-            if (!users) {
+    mongoose.models.trn_user_activities.find({ room: matchid, isPresent: true })
+        .exec(function (err, userActivities) {
+            if (!userActivities) {
                 if (callback)
                     return callback(null);
                 else
                     return;
             }
 
-            async.eachLimit(users, 500, (user, cbk) => {
-                return mongoose.models.users.addAchievementPoint(user.user, { uniqueid: 'persist_gamer', value: 1 }, cbk);
+            async.eachLimit(userActivities, 500, (userActivity, cbk) => {
+                return mongoose.models.users.addAchievementPoint(userActivity.user, { uniqueid: 'persist_gamer', value: 1 }, cbk);
             }, () => {
                 if (callback)
                     callback(null);
@@ -52,35 +52,28 @@ Handler.Reward.update_achievement = function (userId, achievementUId, achievemen
 Handler.Reward.rank_achievements = function (matchid, outerCallback) {
     console.log("Calculating and sending rank achievements");
     async.waterfall([
-        // First we must find all leaderboards for the matchid
-        function (callback) {
-            var p = mongoose.models.pool.find({ gameid: matchid });
-            p.exec(callback);
-        },
-        function (pools, callback) {
-            mongoose.models.gameserversettings.findOne({}, (mongoErr, settings) => {
-                if (mongoErr)
-                    return callback(mongoErr);
 
-                return callback(null, pools, settings);
-            });
-        },
-        function (pools, settings, callback) {
-            mongoose.models.scheduled_matches
-                .findById(matchid, '_id disabled start home_team away_team home_score away_score')
-                .populate('_id home_team away_team', 'name')
-                .exec((mongoErr, match) => {
-                    if (mongoErr)
-                        return callback(mongoErr);
-
-                    if (!match)
-                        return callback(new Error(`Match id ${matchid} is not found`));
-
-                    return callback(null, pools, settings, match);
-                });
+        (callback) => {
+            return async.parallel([
+                // First we must find all leaderboards for the matchid
+                (cbk) => mongoose.models.trn_leaderboard_defs
+                    .find({ gameid: matchid })
+                    .populate('tournament')
+                    .populate('tournamentMatch')
+                    .exec(cbk),
+                (cbk) => mongoose.models.trn_server_settings.findOne({}, cbk),
+                //(cbk) => mongoose.models.matches
+                //        .findById(matchid, '_id disabled start home_team away_team home_score away_score')
+                //        .populate('_id home_team away_team', 'name')
+                //        .exec(cbk)
+            ], callback);
         },
         // Get all leaderboards from match pools, assign arrays with player positions
-        function (pools, serverSettings, match, callback) {
+        (parallelResults, callback) => {
+
+            const pools = parallelResults[0];
+            const serverSettings = parallelResults[1];
+            const match = parallelResults[2];
             var top1s = [];
             var top10s = [];
             var top100s = [];
@@ -88,7 +81,7 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
 
             var pushNotifications = serverSettings.pushNotifications;
 
-            if (pools.length == 0) 
+            if (pools.length === 0) 
                 pools[0] = { game_id: matchid };
 
             var matchName = { en: '', ar: '' };

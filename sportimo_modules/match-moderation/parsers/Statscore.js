@@ -5,13 +5,10 @@
 const scheduler = require('node-schedule');
 const amqp = require('../../../amqp.node/callback_api');
 const needle = require("needle");
-const crypto = require("crypto-js");
 const async = require('async');
 const _ = require('lodash');
 const moment = require('moment');
 const winston = require('winston');
-const mongoose = require('mongoose');
-const matches = mongoose.models.scheduled_matches;
 const EventEmitter = require('events');
 const MessagingTools = require('../../messaging-tools');
 const SocksConnection = require('../../../socksjs/socksjs'); // require('socksjs');
@@ -1358,8 +1355,8 @@ const UnbookMatch = function (statscoreMatchId, callback) {
 }
 
 
-const GetPastEventFeedPage = function(statscoreMatchId, page, callback) {
-    const url = `${configuration.urlApiPrefix}feed/${statscoreMatchId}?token=${authToken}&limit=500&page=${page}`;
+const GetPastEventFeedPage = function (statscoreMatchId, pageUrl, callback) {
+    const url = pageUrl || `${configuration.urlApiPrefix}feed/${statscoreMatchId}?token=${authToken}&limit=500&page=1`;
 
     needle.get(url, needleOptions, function (error, response) {
         if (error) {
@@ -1367,16 +1364,8 @@ const GetPastEventFeedPage = function(statscoreMatchId, page, callback) {
             return callback(error);
         }
 
-        let totalItems = null;
-        let totalPages = 0;
-
-        if (response && response.body && response.body.api && response.body.api.data && _.isArray(response.body.api.data)) {
-            if (response && response.body && response.body.api && response.body.api.method && response.body.api.method.total_items) {
-                totalItems = response.body.api.method.total_items;
-                totalPages = Math.trunc(totalItems / 500) + 1;
-            }
-
-            return callback(null, response.body.api.data, totalPages);
+        if (response && response.body && response.body.api && response.body.api.data && response.body.api.method && _.isArray(response.body.api.data)) {
+            return callback(null, response.body.api.data, response.body.api.method.next_page);
         }
         else {
             let errorMsg = `Failed fetching event feed ${statscoreMatchId} `;
@@ -1387,7 +1376,7 @@ const GetPastEventFeedPage = function(statscoreMatchId, page, callback) {
             return callback(new Error(errorMsg));
         }
     });
-}
+};
 
 const GetPastEventFeed = function (statscoreMatchId, callback) {
     const now = new Date();
@@ -1400,60 +1389,27 @@ const GetPastEventFeed = function (statscoreMatchId, callback) {
                 return async.setImmediate(() => { return cbk(null, authToken); });
         },
         (authToken, cbk) => {
+
             let allEvents = [];
+            let pageUrl = null;
+            let goToNextPage = true;
 
-            GetPastEventFeedPage(statscoreMatchId, 1, (firstPageErr, firstPageResults, totalPages) => {
-                if (firstPageErr)
-                    return cbk(firstPageErr);
+            async.whilst(() => { return goToNextPage === true; }, (innerCbk) => GetPastEventFeedPage(statscoreMatchId, pageUrl, (pageErr, pageResults, nextPageUrl) => {
 
-                allEvents = allEvents.concat(firstPageResults);
+                goToNextPage = !!nextPageUrl;
+                pageUrl = nextPageUrl;
 
-
-                if (totalPages > 1) {
-                    const pageRange = _.range(2, totalPages + 1);
-                    return async.each(pageRange, (page, asyncCbk) => {
-                        GetPastEventFeedPage(statscoreMatchId, page, (pageErr, pageResults, totPages) => {
-                            if (pageErr) {
-                                log.error(pageErr);
-                            } else {
-                                allEvents = allEvents.concat(pageResults);
-                            }
-                            return asyncCbk(null, allEvents);
-                        });
-                    }, (asyncErr) => {
-                        if (asyncErr)
-                            return cbk(asyncErr);
-
-                        return cbk(null, allEvents);
-                    });
+                if (pageErr) {
+                    log.error(pageErr);
+                    return innerCbk(pageErr);
+                } else {
+                    allEvents = allEvents.concat(pageResults);
                 }
-                else
-                    return cbk(null, allEvents);
-            });
-
-
-            //const url = `${configuration.urlApiPrefix}feed/${statscoreMatchId}?token=${authToken}&limit=500`;
-            //needle.get(url, needleOptions, function (error, response) {
-            //    if (error) {
-            //        log.error(error.stack);
-            //        return cbk(error);
-            //    }
-
-
-            //    if (response && response.body && response.body.api && response.body.api.data && _.isArray(response.body.api.data))
-            //        return cbk(null, response.body.api.data);
-            //    else {
-            //        let errorMsg = `Failed booking event ${statscoreMatchId} `;
-            //        if (response && response.body && response.body.api && response.body.api.error && response.body.api.error.message) {
-            //            errorMsg += ': ' + response.body.api.error.message;
-            //        }
-
-            //        return cbk(new Error(errorMsg));
-            //    }
-            //});
+                return innerCbk(null, allEvents);
+            }), cbk);
         }
     ], callback);
-}
+};
 
 
 const GetEventStatus = function (statscoreMatchId, callback) {

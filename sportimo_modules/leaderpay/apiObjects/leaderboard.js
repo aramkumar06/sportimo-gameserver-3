@@ -46,19 +46,6 @@ api.getLeaderboard = function (conditions, skip, limit, cb) {
                 .orderBy(["score"], ["desc"])
                 .value();
 
-        // for (var key in result)
-        //     result[key].sort(function (a, b) { var x = a.DisplayName, y = b.DisplayName; return x === y ? 0 : x < y ? -1 : 1; });
-
-        // console.log(result);
-        // var rank = 1;
-        // var last_score = 0;
-
-        // _.each(result, function(userEntry){
-
-        // })
-
-
-
         cbf(cb, err, Ranked(result));
     });
 

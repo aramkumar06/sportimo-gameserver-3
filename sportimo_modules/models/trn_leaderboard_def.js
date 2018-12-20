@@ -8,11 +8,14 @@ if (mongoose.models.trn_leaderboard_defs)
     module.exports = mongoose.models.trn_leaderboard_defs;
 else {
 
-    var prizeSchema = new Schema({
-        rank: { type: Number, min: 0 },
-        rank_from: { type: Number, min: 0 },
-        rank_to: { type: Number, min: 0 },
-        prize: { type: Schema.Types.ObjectId, ref: 'prizes' }
+    var positionType = new Schema({
+        from: { type: Number, default: 1, required: true },
+        to: { type: Number, default: null, required: false }
+    });
+
+    var leaderboardPrizeSchema = new Schema({
+        position: { type: positionType },
+        prize: { type: ObjectId, ref: 'trn_prizes', required: true }
     });
 
     var leaderboarddef = {
@@ -20,7 +23,9 @@ else {
         // New fields
         client: { type: ObjectId, ref: 'trn_clients' },
         tournament: { type: ObjectId, ref: 'tournaments' },
-        tournament_match: { type: ObjectId, ref: 'trn_matches' },  // optional if bound to one specific match (not on a whole tournament)
+
+        tournament_match: { type: ObjectId, ref: 'trn_matches' },   // optional if bound to one specific match (not on a whole tournament)
+        match: { type: Schema.Types.ObjectId, ref: 'matches' },     // optional if bound to one specific match (not on a whole tournament)
 
         title: { type: Schema.Types.Mixed },
         info: { type: Schema.Types.Mixed },
@@ -30,10 +35,12 @@ else {
         // The number of best scores per user. If null leaderboard is comprised by all user scores.  
         bestscores: Number,
 
-        prizes: [{ type: prizeSchema }],
+        prizes: [{ type: leaderboardPrizeSchema }],
 
         // conditions: [{ condition: "Country", value:["GR","UK","SA"]}, {condition: "Age", value:["17"]}]
         country: [{ type: String }],
+
+        starsProcessed: { type: Boolean, default: false },  // used in the automated stars update method to denote whether this document is already taken into account
 
         created: { type: Date, default: Date.now }
     };

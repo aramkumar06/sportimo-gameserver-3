@@ -16,7 +16,7 @@ api.players = function (req, res) {
 	if(req.query.limit!=undefined)
 		limit=req.query.limit;
 
-	player.getAllPlayers(skip,limit,function(err,data){
+	player.getAll(skip,limit,function(err,data){
 		if (err) {
 			res.status(500).json(err);
 		} else {
@@ -24,11 +24,12 @@ api.players = function (req, res) {
 		}
 	}); 
 };
+router.get('/v1/data/players', api.players);
 
 
-api.getPlayersByTeam = function (req, res) {
+api.getByTeam = function (req, res) {
 
-	player.getPlayersByTeam(req.params.teamid, function(err,data){
+	player.getByTeam(req.params.teamid, function(err,data){
 		if (err) {
 			res.status(500).json(err);
 		} else {
@@ -36,26 +37,58 @@ api.getPlayersByTeam = function (req, res) {
 		}
 	}); 
 };
+router.get('/v1/data/players/team/:teamid', api.getByTeam);
+
+
 
 // GET (search)
 api.searchPlayers = function (req, res) {
     var searchTerm = req.params.searchTerm;
     var teamId = req.query.teamId;
 
-    player.searchPlayers(searchTerm, teamId, function (err, data) {
+    player.search(searchTerm, teamId, function (err, data) {
         if (err) {
             res.status(500).json(err);
         } else {
             res.status(200).json(data);
         }
     });
-}
+};
+router.get('/v1/data/players/search/:searchTerm', api.searchPlayers);
 
+
+// GET one by id
+api.player = function (req, res) {
+	var id = req.params.id;
+	player.getById(id,function(err,data){
+		if (err) {
+			res.status(404).json(err);
+		} else {
+			res.status(200).json({player: data});
+		}
+	}); 
+};
+router.get('/v1/data/players/:id', api.player);
+
+
+// GET all teams by id
+api.playerTeams = function (req, res) {
+
+	var id = req.params.id;
+    player.getTeams(id, function(err,data){
+		if (err) {
+			res.status(404).json(err);
+		} else {
+			res.status(200).json({teams: data});
+		}
+	}); 
+};
+router.get('/v1/data/players/:id/teams', api.playerTeams);
 
 
 // POST
 api.addplayer = function (req, res) {
-	player.addPlayer(req.body,function	(err,data){
+	player.add(req.body,function	(err,data){
         if (err) {
             logger.log('error', err.stack, req.body);
             res.status(500).json(err);
@@ -65,24 +98,13 @@ api.addplayer = function (req, res) {
 		}
 	});	
 };
-
-// GET
-api.player = function (req, res) {
-	var id = req.params.id;
-	player.getPlayer(id,function(err,data){
-		if (err) {
-			res.status(404).json(err);
-		} else {
-			res.status(200).json({player: data});
-		}
-	}); 
-};
+router.post('/v1/data/players', api.addplayer);
 
 // PUT
 api.editPlayer = function (req, res) {
 	var id = req.params.id;
 
-	return player.editPlayer(id,req.body, function (err, data) {
+	return player.edit(id,req.body, function (err, data) {
 		if (!err) {
 			l.p("updated player");
 			return res.status(200).json(data);
@@ -90,15 +112,15 @@ api.editPlayer = function (req, res) {
             logger.log('error', err.stack, req.body);
 			return res.status(500).json(err);
 		}
-		return res.status(200).json(data);   
 	});
-
 };
+router.put('/v1/data/players/:id', api.editPlayer);
+
 
 // DELETE
 api.deletePlayer = function (req, res) {
 	var id = req.params.id;
-	return player.deletePlayer(id, function (err, data) {
+	return player.delete(id, function (err, data) {
 		if (!err) {
 			l.p("removed player");
 			return res.status(204).send();
@@ -108,10 +130,12 @@ api.deletePlayer = function (req, res) {
 		}
 	});
 };
+router.delete('/v1/data/players/:id', api.deletePlayer);
+
 
 // DELETE All
 api.deleteAllPlayers = function (req, res) {
-	return player.deleteAllPlayers( function (err, data) {
+	return player.deleteAll( function (err, data) {
 		if (!err) {
 			l.p("removed All player");
 			return res.status(204).send();
@@ -121,27 +145,13 @@ api.deleteAllPlayers = function (req, res) {
 		}
 	});
 };
+// router.delete('/v1/data/players', api.deleteAllPlayers);
 
 /*
 =====================  ROUTES  =====================
 */
 
 
-router.post('/v1/data/players',api.addplayer);
-
-router.route('/v1/data/players/:id')
-.get(api.player)
-.put(api.editPlayer)
-.delete(api.deletePlayer);
-
-router.get('/v1/data/players/team/:teamid', api.getPlayersByTeam);
-
-router.get('/v1/data/players/search/:searchTerm', api.searchPlayers);
-
-
-router.route('/v1/data/players')
-.get(api.players);
-// .delete(api.deleteAllPlayers);
 
 
 router.get('/players/test',function(req,res){

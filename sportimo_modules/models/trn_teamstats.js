@@ -10,8 +10,8 @@ if (mongoose.models.trn_teamstats)
 else {
     var teamStats = {
         team: { type: ObjectId, ref: 'trn_teams' },
-        competition: { type: ObjectId, ref: 'competitions' },
-        season: { type: Schema.Types.Mixed },
+        competition: { type: ObjectId, ref: 'trn_competitions' },
+        season: { type: ObjectId, ref: 'trn_competition_seasons' },
 
         recentform: [String], // an array of String of type "W","L","D"
         nextmatch: Schema.Types.Mixed,

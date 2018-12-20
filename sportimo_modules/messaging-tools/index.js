@@ -13,7 +13,7 @@ var mongoose = require('mongoose'),
 
 var PublishChannel = null;
 // Heroku servers Redis though Environment variable
-PublishChannel = redis.createClient(process.env.REDIS_URL || "redis://h:pa4daaf32cd319fed3e9889211b048c2dabb1f723531c077e5bc2b8866d1a882e@ec2-34-247-112-146.eu-west-1.compute.amazonaws.com:6799");
+PublishChannel = redis.createClient(process.env.REDIS_URL || "redis://h:pa4daaf32cd319fed3e9889211b048c2dabb1f723531c077e5bc2b8866d1a882e@ec2-63-32-222-217.eu-west-1.compute.amazonaws.com:6469");
 // PublishChannel.auth(redisCreds.secret, function (err) {
 //     if (err) {
 //         console.log(err);
@@ -416,7 +416,13 @@ MessagingTools.sendSocketMessageToUsers = function (ids, message) {
                 }
             }
         }));
-}
+};
+
+MessagingTools.sendSocketMessage = function (messageObject, callback) {
+    if (PublishChannel)
+        PublishChannel.publish("socketServers", JSON.stringify(messageObject), callback);
+};
+
 
 MessagingTools.SendTauntToUser = function (tauntData) {
     if (PublishChannel)

@@ -18,6 +18,7 @@ else {
 
         // New fields in v3
         shortName: { type: Schema.Types.Mixed },
+        abbr: { type: String }
     };
 
     var playerSchema = new Schema(player);

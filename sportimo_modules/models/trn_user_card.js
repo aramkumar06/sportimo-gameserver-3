@@ -38,9 +38,9 @@ else {
         // New fields
         client: { type: ObjectId, ref: 'trn_clients' },
         tournament: { type: ObjectId, ref: 'tournaments', required: true },
-        //tournamentMatch: { type: ObjectId, ref: 'trn_matches', required: true },
+        tournamentMatch: { type: ObjectId, ref: 'trn_matches', required: true },
 
-        matchid: String,    // this is a id ref to tournament_matches
+        matchid: { type: String, ref: 'matches', required: true },    // this is a id ref to tournament_matches
         userid: String,
         gamecardDefinitionId: {
             type: String,

@@ -8,14 +8,33 @@ var express = require('express'),
 
 api.getAll = function (req, res) {
 
-    stars.getAll(function (err, data) {
+    const clientId = req.params.clientId;
+
+    stars.getAll(clientId, function (err, data) {
         if (err) {
             res.status(500).json(err);
         } else {
             res.status(200).json(data);
         }
     });
-}
+};
+router.get('/v1/data/client/:clientId/stars/', api.getAll);
+
+
+api.updateAll = function (req, res) {
+
+    const clientId = req.params.clientId;
+
+    stars.updateFromAllPools(clientId, function (err, data) {
+        if (err) {
+            res.status(500).json(err);
+        } else {
+            res.status(200).json(data);
+        }
+    });
+};
+router.post('/v1/data/client/:clientId/stars/update', api.updateAll);
+
 /*
 api.add = function (req, res) {
 

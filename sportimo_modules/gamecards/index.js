@@ -24,82 +24,39 @@ var path = require('path'),
     express = require('express'),
     moment = require('moment'),
     async = require('async'),
-    winston = require('winston'),
+    log = require('winston'),
     _ = require('lodash'),
     bodyParser = require('body-parser'),
     mongoose = require('mongoose'),
     achievements = require('../bedbugAchievements');
 
-var log = new (winston.Logger)({
-    levels: {
-        prompt: 6,
-        debug: 5,
-        info: 4,
-        core: 3,
-        warn: 1,
-        error: 0
-    },
-    colors: {
-        prompt: 'grey',
-        debug: 'blue',
-        info: 'green',
-        core: 'magenta',
-        warn: 'yellow',
-        error: 'red'
-    }
-});
-
-log.add(winston.transports.Console, {
-    timestamp: true,
-    level: process.env.LOG_LEVEL || 'debug',
-    prettyPrint: true,
-    colorize: 'level'
-});
-
 /* Module to handle user feedback */
 var MessagingTools = require('../messaging-tools');
 
-/* Mongoose model
-Used to access wildcards store in database*/
-var UserGamecard;
-
-
-/*Main module*/
-var gamecards = {};
 
 /*The database connection*/
-var db = null;
+var db = mongoose;
 
-/*The redis pub/sub chanel for publishing*/
-var redisPublish = null;
-var redisSubscribe = null;
+/* Mongoose model
+Used to access wildcards store in database*/
+var UserGamecard = mongoose.models.trn_user_cards;
+
+
+///*The redis pub/sub chanel for publishing*/
+//var redisPublish = null;
+//var redisSubscribe = null;
 
 /*The tick handler*/
 var tickSchedule = null;
 
+/*Main module*/
+var gamecards = {};
 
 
-/**
- * Perform initialization functions
- * @param {Object} dbconnection a mongoose connection object
- * @param {Object} redisPublishChannel a redis publishing channel
- * @param {Object} redisSubscribeChannel a redis subscription channel
- */
-gamecards.connect = function (dbconnection, redisPublishChannel) {
-    if (!db) {
-        db = dbconnection;
-        UserGamecard = mongoose.models.trn_user_cards;
-    }
-
-    //if (!redisPublish)
-    // Enforce re-registering the redisPublish object, to ensure proper initialization
-    redisPublish = redisPublishChannel;
-};
-
-gamecards.init = function (match) {
+gamecards.init = function (tournamentMatch) {
     if (db === null || UserGamecard === null) {
         log.error("No active database connection found. Aborting.");
-        return new Error('No active database connection found. Aborting.');
+        return new Error('[Gamecards module] No active database connection found. Aborting.');
     }
 
     if (!tickSchedule)
@@ -108,20 +65,21 @@ gamecards.init = function (match) {
     // Check if match has trn_card_definitions written in mongo from the trn_card_templates and if their appearanceConditions are met, if not, create them.
     async.waterfall([
         function (callback) {
-            db.models.trn_card_templates.find({ isActive: true }, function (error, templates) {
+            db.models.trn_card_templates.find({ client: tournamentMatch.client, tournament: tournamentMatch.tournament, isActive: true }, function (error, templates) {
                 if (error)
                     return callback(error);
                 callback(null, templates);
             });
         },
         function (templates, callback) {
-            db.models.trn_card_definitions.find({ matchid: match._id.toString() }, function (error, definitions) {
+            db.models.trn_card_definitions.find({ client: tournamentMatch.client, tournament: tournamentMatch.tournament, matchid: tournamentMatch.match.id }, function (error, definitions) {
 
                 if (error)
                     return callback(error);
 
-                if (templates == null || templates.length === 0)
+                if (templates === null || templates.length === 0)
                     return callback(null);
+
                 //callback(null, definitions);
                 let usedTemplateIds = [];
                 _.forEach(definitions, function (definition) {
@@ -132,7 +90,7 @@ gamecards.init = function (match) {
                 // Now instantiate all not found templates into new gamecardDefinitions
                 _.forEach(templates, function (template) {
                     if (_.indexOf(usedTemplateIds, template.id) === -1) {
-                        gamecards.createDefinitionFromTemplate(template, match);
+                        gamecards.createDefinitionFromTemplate(template, tournamentMatch);
                     }
                 });
             });
@@ -163,7 +121,7 @@ gamecards.createMatchDefinitions = function (matchid, callback) {
     // Check if match has trn_card_definitions written in mongo from the trn_card_templates and if their appearanceConditions are met, if not, create them.
     async.waterfall([
         function (callback) {
-            var q = db.models.scheduled_matches.findById(matchid);
+            var q = db.models.matches.findById(matchid);
             q.populate('home_team away_team', 'name');
             q.exec(function (error, match) {
                 if (error)
@@ -321,7 +279,7 @@ gamecards.addMatchDefinition = function (gamecard, callback) {
             return callback(error);
         callback(null, newDef);
 
-        redisPublish.publish("socketServers", JSON.stringify({
+        MessagingTools.sendSocketMessage({
             sockets: true,
             payload: {
                 type: "Message",
@@ -331,7 +289,7 @@ gamecards.addMatchDefinition = function (gamecard, callback) {
                     message: { "en": "A new game card has been created for your enjoyment." }
                 }
             }
-        }));
+        });
     });
 }
 
@@ -432,7 +390,7 @@ gamecards.validateDefinition = function (gamecardDefinition) {
 };
 
 
-gamecards.createDefinitionFromTemplate = function (template, match) {
+gamecards.createDefinitionFromTemplate = function (template, tournamentMatch) {
 
     // Disabled. Client decides proper substitution of team name. 
     let replaceTeamNameLocale = function (teamname, prompt, placeholder) {
@@ -447,7 +405,7 @@ gamecards.createDefinitionFromTemplate = function (template, match) {
         return newPrompt;
     };
 
-
+    const match = tournamentMatch.match;
     let creationTime = moment.utc();
     let activationTime = template.activationLatency ? moment.utc(creationTime).add(template.activationLatency, 'ms') : moment.utc(creationTime);
     let terminationTime = template.duration ? moment.utc(activationTime).add(template.duration, 'ms') : null;
@@ -456,7 +414,10 @@ gamecards.createDefinitionFromTemplate = function (template, match) {
 
 
     let newDefinition = new db.models.trn_card_definitions({
-        matchid: match._id.toString(),
+        client: template.client,
+        tournament: tournamentMatch.tournament,
+        tournamentMatch: tournamentMatch.id,
+        matchid: match.id,
         gamecardTemplateId: template.id,
         creationTime: creationTime.toDate(),
         text: template.text,
@@ -610,12 +571,14 @@ gamecards.createDefinitionFromTemplate = function (template, match) {
     });
 };
 
-
+/* removed due to being client-specific logic
+ * 
+ * 
 // Select all trn_card_definitions, and filter for those that have remainingUserInstances in their userGamecards counterparts null or > 0
 gamecards.getUserInstances = function (matchId, userId, cbk) {
     async.parallel([
         (callback) => {
-            return db.models.scheduled_matches
+            return db.models.matches
                 .findById(matchId, {
                     settings: 1,
                     state: 1,
@@ -739,7 +702,7 @@ gamecards.getUserInstances = function (matchId, userId, cbk) {
         return cbk(null, userGamecardDefinitions);
     });
 };
-
+*/
 
 /* 
 * Each time a gamecard is played by a user, it has to be validated before being added to the userWildcards collection in Mongo
@@ -759,6 +722,11 @@ gamecards.getUserInstances = function (matchId, userId, cbk) {
 * the user should not play the same gamecard definition while the previous one played is active and is not yet resolved
 * the referenced match is not completed
 */
+
+/* removed due to being client-specific logic
+ * 
+ * 
+ * 
 gamecards.validateUserInstance = function (matchId, userGamecard, callback) {
 
     if (!userGamecard.gamecardDefinitionId)
@@ -842,7 +810,7 @@ gamecards.validateUserInstance = function (matchId, userGamecard, callback) {
             });
         },
         function (cbk) {
-            db.models.scheduled_matches
+            db.models.matches
                 .findById(matchId, 'home_team away_team competition start completed state time settings home_score away_score')
                 .populate('home_team away_team', 'name')
                 .exec(function (error, match) {
@@ -1071,10 +1039,10 @@ gamecards.addUserInstance = function (matchId, gamecard, callback) {
                 if (error)
                     return callback(error);
 
-                db.models.useractivities.SetMatchPlayed(newCard.userid, newCard.matchid);
+                db.models.trn_user_activities.SetMatchPlayed(newCard.userid, newCard.matchid);
                 // Register user activity - 'PlayedCard'
                 var statsToUpdateQuerry = 'cardsPlayed ' + newCard.cardType.toLowerCase() + 'CardsPlayed';
-                db.models.useractivities.IncrementStat(newCard.userid, newCard.matchid, statsToUpdateQuerry, 1);
+                db.models.trn_user_activities.IncrementStat(newCard.userid, newCard.matchid, statsToUpdateQuerry, 1);
 
                 callback(null, null, gamecards.TranslateUserGamecard(newCard));
             });
@@ -1257,7 +1225,7 @@ gamecards.updateUserInstance = function (userGamecardId, options, outerCallback)
             });
     });
 };
-
+*/
 
 gamecards.TranslateUserGamecard = function (userGamecard) {
     let retValue = {
@@ -1313,7 +1281,7 @@ gamecards.TranslateUserGamecard = function (userGamecard) {
 // from the database.
 // CAUTION: USE ONLY FOR TESTING PURPOSES IN DEVELOPMENT ENVIRONMENT
 gamecards.deleteUserInstance = function (gamecardId, callback) {
-    db.models.gamecards.findById({ _id: gamecardId }, function (error, gamecard) {
+    db.models.trn_user_cards.findById({ _id: gamecardId }, function (error, gamecard) {
         if (error)
             return callback(error);
 
@@ -1439,7 +1407,7 @@ gamecards.Tick = function () {
                 // Get all matches for these gamecards to be used to build the push notification messages for all winning cards
                 const matchIds = _.uniq(_.map(data, 'matchid'));
                 const matchObjectIds = _.map(matchIds, mongoose.Types.ObjectId);
-                db.models.scheduled_matches
+                db.models.matches
                     .find({ _id: { $in: matchObjectIds } }, 'state home_team away_team home_score away_score')
                     .populate('home_team away_team', 'name')
                     .exec(function (matchError, matches) {
@@ -1471,7 +1439,7 @@ gamecards.Tick = function () {
 
                                 // Send an event through Redis pu/sub:
                                 // log.info("Card lost: " + gamecard);
-                                redisPublish.publish("socketServers", JSON.stringify({
+                                MessagingTools.sendSocketMessage({
                                     sockets: true,
                                     clients: [gamecard.userid],
                                     payload: {
@@ -1480,7 +1448,7 @@ gamecards.Tick = function () {
                                         room: gamecard.matchid,
                                         data: gamecards.TranslateUserGamecard(gamecard)
                                     }
-                                }));
+                                });
                             }
                             return gamecard.save(cbk);
                         }, callback);
@@ -1494,7 +1462,7 @@ gamecards.Tick = function () {
 
             let itsNow = moment.utc();
             // console.log("Preset Activation Tick: " + itsNow.toISOString());
-            db.models.scheduled_matches
+            db.models.matches
                 .find({ completed: { $ne: true }, state: { $gt: 0 } }, '_id state time stats home_team away_team home_score away_score')
                 .populate('home_team away_team', 'name')
                 .exec(function (error, matches) { // cannot test matches in the future , start: { $lt: itsNow.toDate() }
@@ -1568,7 +1536,7 @@ gamecards.Tick = function () {
                                 });
 
                                 async.each(userGamecards, function (userGamecard, cardCbk) {
-                                    redisPublish.publish("socketServers", JSON.stringify({
+                                    MessagingTools.sendSocketMessage({
                                         sockets: true,
                                         clients: [userGamecard.userid],
                                         payload: {
@@ -1577,7 +1545,7 @@ gamecards.Tick = function () {
                                             room: userGamecard.matchid,
                                             data: gamecards.TranslateUserGamecard(userGamecard)
                                         }
-                                    }));
+                                    });
 
                                     return userGamecard.save(cardCbk);
                                 }, parallelCbk);
@@ -1691,7 +1659,7 @@ gamecards.HandleUserCardRewards = function (uid, mid, cardType, cardPrimaryStat,
 
     return async.parallel([
         (cbk) => {
-            db.models.scores.AddPoints(uid, mid, pointsToGive, moment.utc().toDate(), function (err, result) {
+            db.models.trn_scores.AddPoints(uid, mid, pointsToGive, moment.utc().toDate(), function (err, result) {
                 if (err) {
                     console.log("-----------------------------------");
                     console.log("Error:");
@@ -1705,7 +1673,7 @@ gamecards.HandleUserCardRewards = function (uid, mid, cardType, cardPrimaryStat,
         (cbk) => {
             // Reward stats
             var statsToUpdateQuerry = 'cardsWon ' + cardType.toLowerCase() + 'CardsWon';
-            db.models.useractivities.IncrementStat(uid, mid, statsToUpdateQuerry, 1, function (err, result) {
+            db.models.trn_user_activities.IncrementStat(uid, mid, statsToUpdateQuerry, 1, function (err, result) {
                 if (err) {
                     log.error(err);
                     return cbk(err);
@@ -1928,7 +1896,7 @@ gamecards.publishWinToUser = function (gamecard) {
     // console.log("called to win:" + Date.now());
     setTimeout(function () {
         // console.log("publish:" + Date.now());
-        redisPublish.publish("socketServers", JSON.stringify({
+        MessagingTools.sendSocketMessage({
             sockets: true,
             clients: [gamecard.userid],
             payload: {
@@ -1937,7 +1905,7 @@ gamecards.publishWinToUser = function (gamecard) {
                 room: gamecard.matchid,
                 data: gamecards.TranslateUserGamecard(gamecard)
             }
-        }));
+        });
     }, 2000);
 };
 
@@ -2026,7 +1994,7 @@ gamecards.GamecardsTerminationHandle = function (mongoGamecards, event, match, c
 
                 // Send an event through Redis pu/sub:
                 // log.info("Card lost: " + gamecard);
-                redisPublish.publish("socketServers", JSON.stringify({
+                MessagingTools.sendSocketMessage({
                     sockets: true,
                     clients: [gamecard.userid],
                     payload: {
@@ -2035,7 +2003,7 @@ gamecards.GamecardsTerminationHandle = function (mongoGamecards, event, match, c
                         room: event.matchid,
                         data: gamecards.TranslateUserGamecard(gamecard)
                     }
-                }));
+                });
                 gamecardChanged = true;
             }
         }
@@ -2316,7 +2284,7 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
                         userGamecard.terminationTime = itsNow.clone().add(remainingDuration, 'ms').toDate();
 
                         // Notify clients through socket server
-                        redisPublish.publish("socketServers", JSON.stringify({
+                        MessagingTools.sendSocketMessage({
                             sockets: true,
                             clients: [userGamecard.userid],
                             payload: {
@@ -2325,7 +2293,7 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
                                 room: userGamecard.matchid,
                                 data: gamecards.TranslateUserGamecard(userGamecard)
                             }
-                        }));
+                        });
 
                         return UserGamecard.update({ _id: userGamecard._id }, { $set: { status: userGamecard.status, resumeTime: userGamecard.resumeTime, terminationTime: userGamecard.terminationTime } }, callback);
                     }
@@ -2389,7 +2357,7 @@ gamecards.ResolveEvent = function (matchEvent) {
             else
                 if (gamecards.CheckIfLooses(gamecard, false)) {
                     // log.info("Card lost: " + gamecard);
-                    redisPublish.publish("socketServers", JSON.stringify({
+                    MessagingTools.sendSocketMessage({
                         sockets: true,
                         clients: [gamecard.userid],
                         payload: {
@@ -2398,7 +2366,7 @@ gamecards.ResolveEvent = function (matchEvent) {
                             room: event.matchid,
                             data: gamecards.TranslateUserGamecard(gamecard)
                         }
-                    }));
+                    });
                 }
             if (event.id && _.indexOf(gamecard.contributingEventIds, event.id) == -1)
                 gamecard.contributingEventIds.push(event.id);
@@ -2430,7 +2398,7 @@ gamecards.ResolveEvent = function (matchEvent) {
     }
     const matchId = individualEvents[0].matchid;
 
-    db.models.scheduled_matches
+    db.models.matches
         .findById(matchId, 'state home_team away_team home_score away_score')
         .populate('home_team away_team', 'name')
         .exec(function (matchError, match) {
@@ -2682,7 +2650,7 @@ gamecards.ReEvaluateAll = function (matchId, outerCallback) {
 
     async.parallel([
         (callback) => {
-            return db.models.scheduled_matches
+            return db.models.matches
                 .findById(matchId)
                 .populate('home_team away_team', 'name')
                 .exec(callback);
@@ -2694,10 +2662,10 @@ gamecards.ReEvaluateAll = function (matchId, outerCallback) {
             return UserGamecard.find({ matchid: matchId }, callback);
         },
         (callback) => {
-            return db.models.scores.find({ game_id: matchId }, callback);
+            return db.models.trn_scores.find({ game_id: matchId }, callback);
         },
         (callback) => {
-            return db.models.useractivities.find({ room: matchId }, callback);
+            return db.models.trn_user_activities.find({ room: matchId }, callback);
         }
     ], (parallelErr, parallelResult) => {
         if (parallelErr) {
@@ -3113,7 +3081,7 @@ gamecards.TerminateMatch = function (match, callback) {
                 gamecard.pointsAwarded = 0;
                 // Send an event through Redis pu/sub:
                 // log.info("Card lost: " + gamecard);
-                redisPublish.publish("socketServers", JSON.stringify({
+                MessagingTools.sendSocketMessage({
                     sockets: true,
                     clients: [gamecard.userid],
                     payload: {
@@ -3122,7 +3090,7 @@ gamecards.TerminateMatch = function (match, callback) {
                         room: gamecard.matchid,
                         data: gamecards.TranslateUserGamecard(gamecard)
                     }
-                }));
+                });
             }
         });
 
@@ -3172,10 +3140,12 @@ try {
     }));
 }
 
-// Loading gamecard API routes
-var apiPath = path.join(__dirname, 'api');
-fs.readdirSync(apiPath).forEach(function (file) {
-    app.use('/', require(apiPath + '/' + file)(gamecards));
+_.once(() => {
+    // Loading gamecard API routes
+    var apiPath = path.join(__dirname, 'api');
+    fs.readdirSync(apiPath).forEach(function (file) {
+        app.use('/', require(apiPath + '/' + file)(gamecards));
+    });
 });
 
 
