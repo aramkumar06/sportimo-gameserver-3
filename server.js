@@ -66,7 +66,7 @@ app.listen(port, function (err) {
         console.error(err);
 
     console.log("------------------------------------------------------------------------------------");
-    console.log("-------       Sportimo v2.0 Game Server %s listening on port %d        --------", version, port);
+    console.log("-------       Sportimo v3.0 Game Server %s listening on port %d        --------", version, port);
     console.log("-------       Environment: " + process.env.NODE_ENV);
     console.log("------------------------------------------------------------------------------------");
 });

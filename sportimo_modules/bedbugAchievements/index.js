@@ -32,7 +32,7 @@ Handler.Reward.persist_gamer = function (matchid, callback) {
                     return;
             });
         });
-}
+};
 
 
 
@@ -42,15 +42,22 @@ Handler.Reward.persist_gamer = function (matchid, callback) {
  */
 Handler.Reward.update_achievement = function (userId, achievementUId, achievementQuantity, callback) {
     return mongoose.models.users.addAchievementPoint(userId, { uniqueid: achievementUId, value: achievementQuantity }, callback);
-}
+};
 
 
 /**
  * Achievement: rank_achievements
  * This method rewards players for their rank position
+ *  
+ * @param {String} matchid the (scheduled match) id
+ * @param {Function} outerCallback a callback function
+ * @returns {null} nothing
  */
 Handler.Reward.rank_achievements = function (matchid, outerCallback) {
     console.log("Calculating and sending rank achievements");
+
+    return outerCallback(null);
+    /*
     async.waterfall([
 
         (callback) => {
@@ -239,7 +246,7 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
             if (outerCallback)
                 outerCallback(err, result);
         });
-
+    */
 }
 
 
