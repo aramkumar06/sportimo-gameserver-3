@@ -74,7 +74,7 @@ else {
                                 };
 
                                 if (user) {
-                                    mongoose.model('scores').findOneAndUpdate({ tournamentMatch: room, user_id: uid },
+                                    mongoose.model('trn_scores').findOneAndUpdate({ tournamentMatch: room, user_id: uid },
                                         score,
                                         { upsert: true, safe: true, new: true },
                                         function (err, result) {
