@@ -75,8 +75,8 @@ else {
             (cbk) => {
                 async.parallel([
                     (innerCbk) => mongoose.models.users.findById(userId, 'client', innerCbk),
-                    (innerCbk) => mongoose.models.trn_subscription.find({ user: userId, state: 'active' }, innerCbk)
-                ], cbk);              
+                    (innerCbk) => mongoose.models.trn_subscriptions.find({ user: userId, state: 'active' }, innerCbk)
+                ], cbk);
             },
             (parallelResults, cbk) => {
                 const user = parallelResults[0];
