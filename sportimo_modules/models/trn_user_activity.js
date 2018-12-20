@@ -1,7 +1,8 @@
 ﻿'use strict';
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema,
-    ObjectId = Schema.Types.ObjectId;
+    ObjectId = Schema.Types.ObjectId,
+    async = require('async');
 var _ = require('lodash');
 
 
@@ -60,7 +61,7 @@ else {
      * @param {Function} cb a function callback
      * @returns The trn_user_activities document update result
      */
-    schema.statics.IncrementStat = function (userId, clientId, tournamentId, tournamentMatch, stat, byvalue, cb) {
+    schema.statics.IncrementStat = function (userId, matchId, stat, byvalue, cb) {
         var statIncr = {};
 
         var stats = _.split(stat, ' ');
@@ -68,37 +69,60 @@ else {
             statIncr[word] = byvalue;
         });
 
-        mongoose.model('trn_user_activities').findOneAndUpdate({
-            user: userId,
-            client: clientId,
-            tournament: tournamentId,
-            tournamentMatch: tournamentMatch.id,
-            room: tournamentMatch.match.id
-        }, {
-                $inc: statIncr,
-                $set: {
-                    user: userId,
-                    client: clientId,
-                    tournament: tournamentId,
-                    tournamentMatch: tournamentMatch.id,
-                    room: tournamentMatch.match.id
-                }
-            }, { upsert: true, new: true }, function (err, activityUpdateResult) {
+        let tournamentsInvolved = 0;
 
+        async.waterfall([
+            (cbk) => {
+                async.parallel([
+                    (innerCbk) => mongoose.models.users.findById(userId, 'client', innerCbk),
+                    (innerCbk) => mongoose.models.trn_subscription.find({ user: userId, state: 'active' }, innerCbk)
+                ], cbk);              
+            },
+            (parallelResults, cbk) => {
+                const user = parallelResults[0];
+                const subscriptions = parallelResults[1];
+
+                if (!user || subscriptions.length === 0)
+                    return cbk(null);
+
+                const tournamentIds = _.map(subscriptions, 'tournament');
+                mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
+            },
+            (trnMatches, cbk) => {
+                if (!trnMatches || trnMatches.length === 0)
+                    return cbk(null);
+
+                tournamentsInvolved = trnMatches.length;
+
+                async.each(trnMatches, (trnMatch, matchCbk) => {
+                    mongoose.model('trn_user_activities').findOneAndUpdate({
+                        user: userId,
+                        client: trnMatch.client,
+                        tournament: trnMatch.tournament,
+                        tournamentMatch: trnMatch.id,
+                        room: matchId
+                    }, {
+                            $inc: statIncr,
+                            $set: {
+                                user: userId,
+                                client: trnMatch.client,
+                                tournament: trnMatch.tournament,
+                                tournamentMatch: trnMatch.id,
+                                room: matchId
+                            }
+                        }, { upsert: true, new: true }, matchCbk);
+                }, cbk);
+            },
+            (activityUpdateResult, cbk) => {
                 var statsPath = {};
 
                 _.each(stats, function (word) {
-                    statsPath['stats.' + word] = byvalue;
+                    statsPath['stats.' + word] = tournamentsInvolved * byvalue;
                 });
 
-                mongoose.model('users').findByIdAndUpdate(userId, { $inc: statsPath }, function (err, userUpdateResult) {
-                    if (err)
-                        console.log(err);
-                    if (cb)
-                        return cb(err, userUpdateResult);
-                });
-
-            });
+                mongoose.model('users').findByIdAndUpdate(userId, { $inc: statsPath }, cbk);
+            }
+        ], cb);
     };
 
 
