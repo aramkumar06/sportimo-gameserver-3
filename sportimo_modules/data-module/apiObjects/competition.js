@@ -1,6 +1,6 @@
 // Module dependencies.
 var mongoose = require('mongoose'),
-Competition = mongoose.models.trn_seasons,
+Competition = mongoose.models.trn_competition_seasons,
 Matches = mongoose.models.matches,
 Standings = mongoose.models.trn_standings,
 api = {},
