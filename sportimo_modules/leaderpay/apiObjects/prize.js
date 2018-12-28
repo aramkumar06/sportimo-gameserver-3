@@ -1,6 +1,6 @@
 // Module dependencies.
 var mongoose = require('mongoose'),
-Prize = mongoose.models.prize,
+Prize = mongoose.models.trn_prizes,
 api = {},
 l=require('../config/lib');
 
