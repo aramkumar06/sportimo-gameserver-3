@@ -2,7 +2,7 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    Poll = mongoose.models.polls,
+    Poll = mongoose.models.trn_polls,
     Users = mongoose.models.users,
     _ = require('lodash'),
     logger = require('winston'),

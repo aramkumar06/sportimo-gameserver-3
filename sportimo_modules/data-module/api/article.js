@@ -2,7 +2,7 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    article = mongoose.models.articles,
+    article = mongoose.models.trn_articles,
     moment = require('moment'),
     logger = require('winston'),
     api = {};
