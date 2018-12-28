@@ -58,6 +58,12 @@ var UserSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: 'trn_clients'
         },
+        // The following is a role mainly to be used in dashboard authorization
+        role: { 
+            type: String,
+            enum: ['user', 'client', 'admin'],
+            default: 'user'
+        },
         wallet: { type: Number, default: 0 },   // gold tickets
         password: {
             type: String,

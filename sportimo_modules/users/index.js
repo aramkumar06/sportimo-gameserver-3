@@ -15,10 +15,10 @@ var config = require('./config'), // get our config file
     User = mongoose.models.users, // get our mongoose model
     ObjectId = mongoose.Types.ObjectId,
     Message = require('../models/message'), // get our mongoose model
-    UserActivities = mongoose.models.useractivities, // get our mongoose model
-    Scores = mongoose.models.scores,
+    UserActivities = mongoose.models.trn_user_activities, // get our mongoose model
+    Scores = mongoose.models.trn_scores,
     Achievements = mongoose.models.achievements,
-    Subscriptions = mongoose.models.subscriptions,
+    Subscriptions = mongoose.models.trn_subscriptions,
     CryptoJS = require("crypto-js");
 var logger = require('winston');
 var _ = require('lodash');
@@ -2165,7 +2165,7 @@ apiRoutes.get('/v1/users/segments/matches', function (req, res) {
     const now = new Date();
     const afterThreshold = moment.utc(now).subtract(1, 'y').toDate();
 
-    mongoose.models.scheduled_matches
+    mongoose.models.matches
         .find({ start: { $gt: afterThreshold }, disabled: false }, '_id start name ')
         .populate('home_team away_team', 'name.en')
         .sort({ start: -1 })
