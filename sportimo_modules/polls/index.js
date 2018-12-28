@@ -23,7 +23,7 @@ var PubChannel;
 var SubChannel;
 
 try {
-    app = require('./../../server');
+    app = require('./../../server').server;
  
     module.exports = function(pub,sub){
         PubChannel = pub;

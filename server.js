@@ -218,6 +218,18 @@ try {
         else {
             console.log("[Game Server] MongoDB Connected.");
 
+            /* Modules */
+
+            app.use('/offline_data/', require('./sportimo_modules/offline_data/api/ondemand.js'));
+
+            var leaderboards_module = require('./sportimo_modules/leaderpay');
+
+            var users_module = require('./sportimo_modules/users');
+
+            var data_module = require('./sportimo_modules/data-module');
+
+            var polls_module = require('./sportimo_modules/polls');
+
             var liveMatches = require('./sportimo_modules/match-moderation');
             if (PublishChannel && SubscribeChannel)
                 liveMatches.SetupRedis(PublishChannel, SubscribeChannel, redisCreds.channel);
@@ -226,20 +238,10 @@ try {
             liveMatches.SetupAPIRoutes(app);
             liveMatches.init(TestSuite.done);
             TestSuite.moderation = liveMatches;
-         }
+        }
+
     });
 
-    /* Modules */
-
-    app.use('/offline_data/', require('./sportimo_modules/offline_data/api/ondemand.js'));
-
-    var leaderboards_module = require('./sportimo_modules/leaderpay');
-
-    var users_module = require('./sportimo_modules/users');
-
-    var data_module = require('./sportimo_modules/data-module');
-
-    var polls_module = require('./sportimo_modules/polls');
 }
 catch (err) {
     console.log(err);

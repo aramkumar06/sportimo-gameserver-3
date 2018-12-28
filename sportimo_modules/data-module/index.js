@@ -21,7 +21,7 @@ var express = require('express'),
 var app = null;
 
 try {
-    app = require('./../../server');
+    app = require('./../../server').server;
     module.exports = this;
 
 } catch (ex) {

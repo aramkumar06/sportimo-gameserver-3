@@ -34,7 +34,7 @@ var tools = {};
 
 
 try {
-    app = require('./../../server');
+    app = require('./../../server').server;
     module.exports = tools;
     // console.log(app.PublishChannel)
 } catch (ex) {
