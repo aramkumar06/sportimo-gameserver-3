@@ -268,7 +268,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 return PushNotifications.MatchModuleStartupFailure(HookedMatch.data, error, () => {
 
                     // Update match in memory of being disabled
-                    thisMatch.disabled = true;
+                    HookedMatch.data.disabled = true;
 
                     //Terminate service
                     if (newService) {
@@ -814,7 +814,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                     updateTimeForMatchId(HookedMatch.id);
                 }, 60000);
             }, secondsToMinuteTick * 1000);
-        })
+        });
 
     }
 
@@ -981,7 +981,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
     HookedMatch.AddEvent = function (event, isAfterLast, cbk) {
 
 
-        var m = matches.findById(HookedMatch.id)
+        var m = matches.findById(HookedMatch.id);
         m.populate("home_team away_team");
         m.exec(function (err, thisMatch) {
             if (err || !thisMatch)

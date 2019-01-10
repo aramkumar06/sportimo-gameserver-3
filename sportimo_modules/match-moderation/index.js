@@ -204,7 +204,7 @@ var ModerationModule = {
         if (!mongoMatchID)
             return new Error("Match ID cannot be empty");
 
-        var oldMatch = ModerationModule.GetMatch(mongoMatchID);
+        var oldMatch = ModerationModule.GetTournamentMatch(mongoMatchID);
         // safeguard for duplicates
         if (oldMatch) {
             log.info("Match with the same ID already exists. Hooking.");
@@ -251,57 +251,40 @@ var ModerationModule = {
         if (cbk)
             cbk("OK");
     },
-    LoadMatchFromDB: function (matchid, cbk) {
+    LoadMatchFromDB: function (tmatchid, cbk) {
 
         tournamentMatches
         .findOne({
-            _id: matchid
+            _id: tmatchid
         })
         .populate({ path: 'match', populate: [{ path: 'home_team', select: 'name abbr logo color' }, { path: 'away_team', select: 'name abbr logo color' }, { path: 'season' }] })
         .exec(function (err, tournamentMatch) {
             if (err)
-                return cbk(err);
+                return cbk ? cbk(err) : err;
 
             if (!tournamentMatch) {
                 log.info(ModerationModule.count);
-                if (cbk)
-                    return cbk("No match with this ID could be found in the database. There must be a match in the database already in order for it to be transfered to the Active matches", null);
-                else
-                    return null;
+                const errMessage = "No match with this ID could be found in the database. There must be a match in the database already in order for it to be transfered to the Active matches";
+                return cbk ? cbk(errMessage) : errMessage;
             }
 
-            var foundMatch = ModerationModule.ModeratedTmatchLookup[match.id];
+            var foundMatch = ModerationModule.ModeratedTmatchLookup[tournamentMatch.id];
 
             if (foundMatch) {
                 // Terminate the active services on the match
-                foundMatch.Terminate(() => {
-                    // Clear all timers that might be active
-                    foundMatch.Timers.clear();
-                    // remove match in case it already exists
-                    delete ModerationModule.RemoveFromLookup(foundMatch.id);
-
-                    // Release to GC
-                    foundMatch = null;
+                ModerationModule.RemoveFromLookup(foundMatch.id, (err) => {
 
                     const hookedMatch = ModerationModule.InsertInLookup(tournamentMatch);
-
-                    if (cbk)
-                        return cbk(null, hookedMatch);
-                    else
-                        return hookedMatch;
+                    return cbk ? cbk(null, hookedMatch) : hookedMatch;
                 });
             }
             else {
                 const hookedMatch = ModerationModule.InsertInLookup(tournamentMatch);
-
-                if (cbk)
-                    return cbk(null, hookedMatch);
-                else
-                    return hookedMatch;
+                return cbk ? cbk(null, hookedMatch) : hookedMatch;
             }
         });
     },
-    GetMatch: function (tmatchId, cbk) {
+    GetTournamentMatch: function (tmatchId, cbk) {
         var match = ModerationModule.ModeratedTmatchLookup[tmatchId];
 
         if (match) {
@@ -312,6 +295,15 @@ var ModerationModule = {
         } else {
             ModerationModule.LoadMatchFromDB(tmatchId, cbk);
         }
+    },
+    GetMatch: function (matchId, cbk) {
+        tournamentMatches.findOne({ match: matchId }, (err, match) => {
+            if (err) {
+                return cbk ? cbk(err) : err;
+            }
+
+            return ModerationModule.GetTournamentMatch(match.id, cbk);
+        });
     },
     // the tournamentMatch includes both tournament refs and the match in its match property, while the hookedMatch includes in its data property the match only
     InsertInLookup: function (tournamentMatch) {
@@ -347,26 +339,36 @@ var ModerationModule = {
 
         return hookedMatch;
     },
-    RemoveFromLookup: function (tmatchId) {
+    RemoveFromLookup: function (tmatchId, cbk) {
 
-        const hookedMatch = ModerationModule.ModeratedTmatchLookup[tmatchId];
 
-        if (!hookedMatch)
-            return;
+        var foundMatch = ModerationModule.ModeratedTmatchLookup[tmatchId];
 
-        //const hookedMatch = ModerationModule.ModeratedMatchLookup[tmatch.id];
-        const matchId = hookedMatch.id;
-        delete ModerationModule.ModeratedTmatchLookup[tmatchId];
+        if (foundMatch) {
+            // Terminate the active services on the match
+            foundMatch.Terminate(() => {
+                // Clear all timers that might be active
+                foundMatch.Timers.clear();
+                // remove match in case it already exists
+                const matchId = foundMatch.id;
+                delete ModerationModule.ModeratedTmatchLookup[tmatchId];
 
-        const tournamentMatches = ModerationModule.ModeratedMatchLookup[matchId];
-        if (tournamentMatches.length === 1)
-            delete ModerationModule.ModeratedMatchLookup[matchId];
-        else {
-            _.remove(ModerationModule.ModeratedMatchLookup[matchId], { 'id': tmatchId });
+                const tournamentMatches = ModerationModule.ModeratedMatchLookup[matchId];
+                if (tournamentMatches.length === 1)
+                    delete ModerationModule.ModeratedMatchLookup[matchId];
+                else {
+                    _.remove(ModerationModule.ModeratedMatchLookup[matchId], { 'id': tmatchId });
+                }
+
+                return cbk ? cbk(null, foundMatch) : foundMatch;
+            });
         }
+        else
+            return cbk ? cbk(null) : null;
+
     }
     //    InjectEvent: function (evnt, res) {
-    //        ModerationModule.GetMatch(evnt.id).AddEvent(evnt.data, res);
+    //        ModerationModule.GetTournamentMatch(evnt.id).AddEvent(evnt.data, res);
     //    },
 };
 
@@ -446,7 +448,7 @@ ModerationModule.AddScheduleMatch = function (match, tournamentId, cbk) {
 
 ModerationModule.ActivateMatch = function (id, state, cbk) {
     // Delete from database
-    var match = ModerationModule.GetMatch(id);
+    var match = ModerationModule.GetTournamentMatch(id);
     match.data.disabled = state;
     matches.findOneAndUpdate({ _id: id }, { $set: { disabled: state } }, cbk);
 };
@@ -463,7 +465,7 @@ ModerationModule.UpdateScheduleMatch = function (match, cbk) {
  */
 ModerationModule.RemoveScheduleMatch = function (id, cbk) {
     // Delete from database
-    const tmatch = ModerationModule.GetMatch(id);
+    const tmatch = ModerationModule.GetTournamentMatch(id);
     
     if (tmatch) {
         tmatch.data.remove();
@@ -501,7 +503,7 @@ ModerationModule.updateMatchcronJobsInfo = function () {
         async.each(trnMatches, function (trnMatch, cbk) {
             const match = trnMatch.match;
             const jobs = _.filter(scheduler.scheduledJobs, { name: match.id });
-            const matchInMemory = ModerationModule.GetMatch(trnMatch.id);
+            const matchInMemory = ModerationModule.GetTournamentMatch(trnMatch.id);
 
             jobs.forEach(job => {
                 if (job && job.nextInvocation()) {

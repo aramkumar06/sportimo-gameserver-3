@@ -2,8 +2,8 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    item = mongoose.models.trn_matches,
-    competition = mongoose.models.competitions,
+    item = mongoose.models.matches,
+    competition = mongoose.models.trn_competitions,
     settings = mongoose.models.settings,
     defaultMatch = require('../config/empty-match'),
     logger = require('winston'),
@@ -13,13 +13,12 @@ var express = require('express'),
 api.items = function (req, res) {
 
     var skip = null, limit = null;
-    var userCountry = req.params.country;
 
     item
-        .find({ hidden: { $ne: true }, $or: [{ visibleInCountries: userCountry }, { visibleInCountries: null }, { visibleInCountries: [] }] })
+        .find({ })
         .populate({
             path: 'match',
-            match: { disabled: { $ne: true }, $or: [{ visiblein: userCountry }, { visiblein: { $exists: false } }, { visiblein: { $size: 0 } }] },
+            match: {  },
             select: 'home_team home_score away_team away_score competition time state start completed',
             populate: [{ path: 'home_team', select: 'name logo' }, { path: 'away_team', select: 'name logo' }, { path: 'competition' }]
         })
@@ -43,30 +42,28 @@ api.itemsSearch = function (req, res) {
         if (req.body.minDate == req.body.maxDate) {
             queries.publishDate.$eq = req.body.minDate;
         } else {
-            if (req.body.minDate != undefined)
+            if (req.body.minDated)
                 queries.publishDate.$gte = req.body.minDate;
-            if (req.body.maxDate != undefined)
+            if (req.body.maxDate)
                 queries.publishDate.$lt = req.body.maxDate;
         }
     }
 
-    if (req.body.tags != undefined)
+    if (req.body.tags)
         queries['tags.name.en'] = { "$regex": req.body.tags, "$options": "i" };
 
-    if (req.body.related != undefined)
+    if (req.body.related)
         queries['tags._id'] = req.body.related;
 
-    if (req.body.type != undefined)
+    if (req.body.type)
         queries.type = req.body.type;
 
     var q = item.find(queries)
-        .populate('home_team')
-        .populate('away_team')
-        .populate('competition');
-
+        .populate( [{ path: 'home_team', select: 'name logo' }, { path: 'away_team', select: 'name logo' }, { path: 'competition' }]);
     q.select('home_team home_score away_team away_score donttouch completed competition time state start disabled');
+    q.sort({ 'start': -1 });
 
-    if (req.body.limit != undefined)
+    if (req.body.limit)
         q.limit(req.body.limit);
 
 
@@ -84,8 +81,10 @@ api.additem = function (req, res) {
         return res.status(400).json('No item Provided. Please provide valid team data.');
     }
 
-    if (req.body.competition == null)
+    if (!req.body.competition)
         return res.status(400).json('No competition Provided. Please provide valid competition ID.');
+    if (!req.body.season)
+        return res.status(400).json('No season Provided. Please provide valid season ID.');
 
     req.body.timeline = [];
     req.body.timeline.push({
@@ -93,64 +92,21 @@ api.additem = function (req, res) {
         text: { en: "Pre Game", ar: "ماقبل المباراة" }
     });
 
-    competition.findById(req.body.competition).then(function (competition) {
+    var mergedData = _.merge(_.cloneDeep(defaultMatch), req.body);
+    var newItem = new item(mergedData);
 
-        // console.log(competition);
-        // var defaultData = new defaultMatch();
-        var mergedData = _.merge(_.cloneDeep(defaultMatch), req.body);
-        var newItem = new item(mergedData);
-        newItem.visiblein = competition.visiblein;
+    return newItem.save(function (err, data) {
+        if (err) {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        } else {
+            const MatchModeration = require('../../match-moderation');
 
-        settings.find({}, function (err, result) {
-            if (err) {
-                logger.log('error', err.stack, req.body);
-                return res.status(500).json(err);
-            }
-            // if (result[0])           
-                newItem.settings = {
-                    "gameCards": {
-                        "instant": 15,
-                        "overall": 15,
-                        "specials": 4,
-                        "totalcards": 15
-                    },
-                    "matchRules": {
-                        "freeUserPlaySegments": [
-                            0,
-                            1,
-                            2
-                        ],
-                        "freeUserHasPlayTimeWindow": false,
-                        "freeUserPregameTimeWindow": 20,
-                        "freeUserLiveTimeWindow": 20,
-                        "freeUserAdsToGetCards": false,
-                        "freeUserCardsCap": false,
-                        "freeUserCardsLimit": 5
-                    },
-                    "hashtag": "#sportimo",
-                    "destroyOnDelete": true,
-                    "sendPushes": true
-                }//result[0].clientdefaults;
-
-            return newItem.save(function (err, data) {
-                if (err) {                   
-                    logger.log('error', err.stack, req.body);
-                    return res.status(500).json(err);
-                } else {
-                    const MatchModeration = require('../../match-moderation');
-
-                    MatchModeration.LoadMatchFromDB(data._id, function () {
-                        return res.status(200).json(data);
-                    });
-                }
+            MatchModeration.LoadMatchFromDB(data._id, function () {
+                return res.status(200).json(data);
             });
-        })
-
-
-    })
-
-
-
+        }
+    });
 };
 
 api.updateVisibility = function (req, res) {

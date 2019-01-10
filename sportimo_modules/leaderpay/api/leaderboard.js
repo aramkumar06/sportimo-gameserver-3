@@ -22,6 +22,13 @@ api.leaderboard = function (req, res) {
     var skip = req.body.skip;
     var limit = req.body.limit;
 
+    if (req.query && req.query.client)
+        conditions.client = req.query.client;
+    if (req.query && req.query.tournament)
+        conditions.tournament = req.query.tournament;
+    if (req.query && req.query.match)
+        conditions.match = req.query.match;
+
 	leaderboard.getLeaderboard(conditions, skip, limit, function (err, data) {
 		if (err) {
 			res.status(404).json(err);

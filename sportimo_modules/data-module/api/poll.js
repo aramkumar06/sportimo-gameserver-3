@@ -2,7 +2,7 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    Poll = mongoose.models.trn_polls,
+    Poll = mongoose.models.trn_leaderboard_defs,
     Users = mongoose.models.users,
     _ = require('lodash'),
     logger = require('winston'),
@@ -11,7 +11,15 @@ var express = require('express'),
 
 // ALL
 api.polls = function (req, res) {
-    var q = Poll.find({}, function (err, data) {
+
+    let query = {};
+
+    if (req.query && req.query.client)
+        query.client = req.query.client;
+    if (req.query && req.query.tournament)
+        query.tournament = req.query.tournament;
+
+    var q = Poll.find(query, function (err, data) {
 
         if (!err) {
             return res.status(200).json(data);
@@ -22,7 +30,15 @@ api.polls = function (req, res) {
 }
 
 api.getPollsByMatch = function (req, res) {
-    var q = Poll.find({ matchid: req.params.mid }, function (err, data) {
+
+    let query = { matchid: req.params.mid };
+
+    if (req.query && req.query.client)
+        query.client = req.query.client;
+    if (req.query && req.query.tournament)
+        query.tournament = req.query.tournament;
+
+    var q = Poll.find(query, function (err, data) {
 
         if (!err) {
             return res.status(200).json(data);
@@ -31,7 +47,7 @@ api.getPollsByMatch = function (req, res) {
             return res.status(500).json(err);
         }
     });
-}
+};
 
 // POST
 api.addpoll = function (req, res) {
@@ -53,6 +69,7 @@ api.addpoll = function (req, res) {
 
 };
 
+
 // GET
 api.poll = function (req, res) {
     var id = req.params.id;
@@ -62,7 +79,7 @@ api.poll = function (req, res) {
         } else {
             return res.status(500).json(err);
         }
-    })
+    });
 };
 
 // PUT
@@ -78,9 +95,8 @@ api.editpoll = function (req, res) {
             return res.status(500).json(err);
         }
     });// eo team.find
-
-
 };
+
 
 // DELETE
 api.deletepoll = function (req, res) {

@@ -60,9 +60,9 @@ try {
 
             if (competitionId) {
                 //statscore.GetPastEventFeed(2436921, (err, result) => {
-                statscore.UpdateTeamPlayersCareerStats("588a8d890bb50f00feda8dbe", 29362, (err, playersUpdated) => {
+                //statscore.UpdateTeamPlayersCareerStats("588a8d890bb50f00feda8dbe", 29362, (err, playersUpdated) => {
                 //statscore.TestGuruStats((err) => {
-                //statscore.MigrateArabicNamesAndKits(competitionId, seasonId, (err, result) => {
+                statscore.MigrateArabicNamesAndKits(competitionId, seasonId, (err, result) => {
                 //statscore.UpdateTeams(competitionId, seasonId, (err, result) => {
                 //statscore.UpdateAllCompetitionStats(competitionId, 2018, (err, result) => {
                 //stats.UpdateAllCompetitionStats(competitionId, 2017, (err, result) => {

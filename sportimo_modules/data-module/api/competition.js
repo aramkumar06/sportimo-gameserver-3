@@ -8,15 +8,18 @@ l=require('../config/lib');
 var api = {};
 // ALL
 api.competitions = function (req, res) {
-	var skip = null, limit = 10;
+	var skip = null, limit = 10, status = null;
 
 	if(req.query.skip !== undefined)
 		skip = req.query.skip;
 
 	if(req.query.limit !== undefined)
-		limit = req.query.limit;
+        limit = req.query.limit;
 
-	competition.getAllCompetitions(skip,limit,function(err,data){
+    if (req.query.status !== undefined)
+        status = req.query.status;
+
+	competition.getAllCompetitions(skip, limit, status, function(err,data){
 		if (err) {
 			res.status(500).json(err);
 		} else {

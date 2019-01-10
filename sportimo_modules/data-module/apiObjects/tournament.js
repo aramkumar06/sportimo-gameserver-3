@@ -1,10 +1,12 @@
 ﻿'use strict';
 
 // Module dependencies.
-var mongoose = require('mongoose'),
+const mongoose = require('mongoose'),
     moment = require('moment'),
     ObjectId = mongoose.Schema.Types.ObjectId,
     Entity = mongoose.models.tournaments,
+    async = require('async'),
+    _ = require('lodash'),
     api = {};
 
 
@@ -64,6 +66,32 @@ api.search = function (clientId, searchTerm, competitionId, cb) {
         .exec(function (err, entities) {
             return cbf(cb, err, entities);
         });
+};
+
+
+api.getUnscheduledMatches = function (clientId, tournamentId, cb) {
+
+    async.waterfall([
+        (cbk) => {
+            const query = { tournament: tournamentId };
+            if (clientId)
+                query.client = clientId;
+
+            mongoose.models.trn_matches.find(query, cbk);
+        },
+        (tMatches, cbk) => {
+            const tMatchIds = _.map(tMatches, 'match');
+            const now = new Date();
+            mongoose.models.matches.find({
+                completed: { $ne: true },
+                start: { $gt: now },
+                _id: { $nin: tMatchIds }
+            })
+            .populate([{ path: 'home_team', select: 'name logo abbr' }, { path: 'away_team', select: 'name logo abbr' }, { path: 'competition', select: 'name logo' }])
+            .select('-timeline -stats')
+            .exec(cbk);
+        }
+    ], cb);
 };
 
 

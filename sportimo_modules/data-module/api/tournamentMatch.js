@@ -8,7 +8,7 @@ var express = require('express'),
 
 
 
-router.get('/v1/data/tournament/:tournamentId/matches', (req, res) => {
+router.get('/v1/data/matches', (req, res) => {
 
     var skip = null, limit = null;
 
@@ -18,7 +18,12 @@ router.get('/v1/data/tournament/:tournamentId/matches', (req, res) => {
     if (req.query.limit !== undefined)
         limit = req.query.limit;
 
-    entity.getAll(req.params.tournamentId, skip, limit, function (err, data) {
+    if (!req.query.client)
+        return res.status(400).jon({ errorCode: 10116, statusCode: 400 });
+    if (!req.query.tournament)
+        return res.status(400).jon({ errorCode: 10116, statusCode: 400 });
+
+    entity.getAll(req.query.tournament, skip, limit, function (err, data) {
         if (err) {
             res.status(500).json(err);
         } else {
@@ -28,11 +33,11 @@ router.get('/v1/data/tournament/:tournamentId/matches', (req, res) => {
 });
 
 
-router.get('/v1/data/tournament/:tournamentId/matches/search/:searchTerm', (req, res) => {
+router.get('/v1/data/matches/search/:searchTerm', (req, res) => {
 
     var searchTerm = req.params.searchTerm;
 
-    entity.search(req.params.tournamentId, skipsearchTerm, function (err, data) {
+    entity.search(req.query.tournament, skipsearchTerm, function (err, data) {
         if (err) {
             res.status(500).json(err);
         } else {
@@ -42,9 +47,9 @@ router.get('/v1/data/tournament/:tournamentId/matches/search/:searchTerm', (req,
 });
 
 
-router.post('/v1/data/tournament/:tournamentId/matches', (req, res) => {
+router.post('/v1/data/matches', (req, res) => {
 
-    entity.add(req.params.tournamentId, req.body, function (err, data) {
+    entity.add(req.body, function (err, data) {
         if (err) {
             res.status(500).json(err);
             logger.log('error', err.stack, req.body);
@@ -56,11 +61,11 @@ router.post('/v1/data/tournament/:tournamentId/matches', (req, res) => {
 });
 
 
-router.get('/v1/data/tournament/:tournamentId/matches/:id', (req, res) => {
+router.get('/v1/data/matches/:id', (req, res) => {
 
     var id = req.params.id;
 
-    entity.getById(req.params.tournamentId, id, function (err, data) {
+    entity.getById(req.query.tournament, id, function (err, data) {
         if (err) {
             logger.log('error', err.stack);
             res.status(404).json(err);
@@ -71,11 +76,11 @@ router.get('/v1/data/tournament/:tournamentId/matches/:id', (req, res) => {
 });
 
 
-router.put('/v1/data/tournament/:tournamentId/matches/:id', (req, res) => {
+router.put('/v1/data/matches/:id', (req, res) => {
 
     var id = req.params.id;
 
-    return entity.edit(req.params.tournamentId, id, req.body, function (err, data) {
+    return entity.edit(req.query.tournament, id, req.body, function (err, data) {
         if (!err) {
             return res.status(200).json(data);
         } else {
@@ -86,11 +91,11 @@ router.put('/v1/data/tournament/:tournamentId/matches/:id', (req, res) => {
 });
 
 
-router.delete('/v1/data/tournament/:tournamentId/matches/:id', (req, res) => {
+router.delete('/v1/data/matches/:id', (req, res) => {
 
     var id = req.params.id;
 
-    return entity.delete(req.params.tournamentId, id, function (err, data) {
+    return entity.delete(req.query.tournament, id, function (err, data) {
         if (!err) {
             return res.status(204).send();
         } else {

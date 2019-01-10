@@ -270,6 +270,7 @@ app.use(function (req, res, next) {
 });
 
 app.use(function (req, res, next) {
+    logger.debug(`inbound ${req.method} ${req.path}`);
     req.mongoose = mongoose.connection;
     req.redisPub = PublishChannel;
     req.redisSub = SubscribeChannel;

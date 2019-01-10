@@ -13,9 +13,9 @@ l=require('../config/lib');
 */
 
 // ALL
-api.getAllCompetitions = function (skip,limit,cb) {
+api.getAllCompetitions = function (skip,limit,status,cb) {
  
-    var q = Competition.find();
+    var q = Competition.find(status ? { status: status } : {});
     q.populate('competition');
   
   // if(skip!=undefined)
@@ -24,9 +24,11 @@ api.getAllCompetitions = function (skip,limit,cb) {
   // if(limit!=undefined)
   //   q.limit(limit*1);
 
-  return q.exec(function(err, competitions) {
-    cbf(cb,err,competitions);    
-  });
+    return q
+        .populate({ path: 'teams', select: 'name logo abbr' })
+        .exec(function (err, competitions) {
+            cbf(cb,err,competitions);    
+        });
 };
 
 // GET

@@ -161,7 +161,7 @@ setTimeout(function () {
 
             });
         });
-    }, 60000);
+    }, 120000);
 }, 5000);
 
 // Helper Methods
@@ -1770,7 +1770,7 @@ Parser.GetCompetitionFixtures = function (competitionId, seasonId, outerCallback
 };
 
 
-const TranslateMatchFixture = function (competition, existingTeamIds, fixture) {
+const TranslateMatchFixture = function (competitionSeason, existingTeamIds, fixture) {
     try {
         const homeTeam = fixture.participants[0];
         const awayTeam = fixture.participants[1];
@@ -1793,12 +1793,13 @@ const TranslateMatchFixture = function (competition, existingTeamIds, fixture) {
             home_team: homeTeamObj,
             away_team: awayTeamObj,
             name: `${existingTeamIds[homeTeam.id] ? existingTeamIds[homeTeam.id].name.en : ''} - ${existingTeamIds[awayTeam.id] ? existingTeamIds[awayTeam.id].name.en : ''}`,
-            competitionId: competition.id,
-            competitionName: competition.name,
+            competition: competitionSeason.competition.id,
+            competitionName: competitionSeason.competition.name,
+            season: competitionSeason.id,
+            seasonName: competitionSeason.name,
             home_score: 0,
             away_score: 0,
             time: null,
-            parserids: {},
             moderation: [],
             start: moment.utc(fixture.start_date).toDate(),
             state: 0
@@ -3216,10 +3217,12 @@ Parser.MigrateArabicNamesAndKits = function (competitionId, seasonId, callback) 
 
             const parserTeamIds = Object.keys(mongoTeamsLookup);
             const parserPlayerIds = Object.keys(mongoPlayersLookup);
+            const parserTeamNumberIds = _.map(parserTeamIds, (n) => parseInt(n, 10));
+            const parserPlayerNumberIds = _.map(parserPlayerIds, (n) => parseInt(n, 10));
 
             async.parallel([
-                (innerCbk) => mongoDb.teams.find({ ['parserids.' + Parser.Name]: { $in: parserTeamIds}}, innerCbk),
-                (innerCbk) => mongoDb.players.find({ ['parserids.' + Parser.Name]: { $in: parserPlayerIds } }, innerCbk)
+                (innerCbk) => mongoDb.teams.find({ $or: [{ ['parserids.' + Parser.Name]: { $in: parserTeamIds } }, { ['parserids.' + Parser.Name]: { $in: parserTeamNumberIds } }] }, innerCbk),
+                (innerCbk) => mongoDb.players.find({ $or: [{ ['parserids.' + Parser.Name]: { $in: parserPlayerIds } }, { ['parserids.' + Parser.Name]: { $in: parserPlayerNumberIds } }] }, innerCbk)
             ], cbk);
         },
         (asyncResults, cbk) => {
@@ -3248,7 +3251,7 @@ Parser.MigrateArabicNamesAndKits = function (competitionId, seasonId, callback) 
                         teamUpdated = true;
                     }
 
-                    if (teamsUpdated)
+                    if (teamUpdated)
                         teamsUpdated++;
                 }
             });

@@ -4,64 +4,65 @@ var express = require('express'),
     mongoose = require('mongoose'),
     player = mongoose.models.players,
     team = mongoose.models.teams,
-    _ =  require('lodash'),
+    _ = require('lodash'),
+    async = require('async'),
     moment = require('moment'),
-    match = mongoose.models.scheduled_matches,
+    match = mongoose.models.matches,
     api = {},
     tags = [];
 
-// ALL
-api.tags = function (req, res) {
+//// ALL
+//api.tags = function (req, res) {
     
-    var skip = null, limit = null;
-    tags = [];
+//    var skip = null, limit = null;
+//    tags = [];
 
-    if (req.query.skip != undefined)
-        skip = req.query.skip;
+//    if (req.query.skip != undefined)
+//        skip = req.query.skip;
 
-    if (req.query.limit != undefined)
-        limit = req.query.limit;
+//    if (req.query.limit != undefined)
+//        limit = req.query.limit;
 
-    var q = player.find();
-    q.select('name pic teamId');
-    q.exec(function (err, players) {
-        players.forEach(function (player) {
-            player = player.toObject();
-            player.type = "Player";
-            tags.push(player);
-        });
+//    var q = player.find();
+//    q.select('name pic teamId');
+//    q.exec(function (err, players) {
+//        players.forEach(function (player) {
+//            player = player.toObject();
+//            player.type = "Player";
+//            tags.push(player);
+//        });
 
-        var t = team.find();
-        t.select('name logo');
-        t.exec(function (err, teams) {
-            teams.forEach(function (team) {
-                team = team.toObject();
-                team.type = "Team";
-                tags.push(team);
-            });
+//        var t = team.find();
+//        t.select('name logo');
+//        t.exec(function (err, teams) {
+//            teams.forEach(function (team) {
+//                team = team.toObject();
+//                team.type = "Team";
+//                tags.push(team);
+//            });
 
-            var m = match.find();
-            m.select('home_team away_team')
-            m.populate('home_team').populate('away_team');
+//            var m = match.find();
+//            m.select('home_team away_team')
+//            m.populate('home_team').populate('away_team');
 
-            m.exec(function (err, matches) {
-                matches.forEach(function (match) {
-                    if (match.home_team) {
-                        var matchTag = { name: { en: "" } };
-                        matchTag.name.en = match.home_team.name.en + " - " + match.away_team.name.en;
-                        matchTag._id = match._id;
-                        matchTag.type = "Event";
-                        tags.push(matchTag);
-                    }
-                });
-                return res.send(tags);
-            });
+//            m.exec(function (err, matches) {
+//                matches.forEach(function (match) {
+//                    if (match.home_team) {
+//                        var matchTag = { name: { en: "" } };
+//                        matchTag.name.en = match.home_team.name.en + " - " + match.away_team.name.en;
+//                        matchTag._id = match._id;
+//                        matchTag.type = "Event";
+//                        tags.push(matchTag);
+//                    }
+//                });
+//                return res.send(tags);
+//            });
 
-        });
+//        });
 
-    });
+//    });
 
-};
+//};
 
 api.tagssearch = function (req, res) {
     var skip = null, limit = null;
@@ -75,47 +76,52 @@ api.tagssearch = function (req, res) {
     
     var term = req.params.term;
 
-    var q = player.find({"name.en": { "$regex": term, "$options": "i" }});
-    q.select('name pic teamId');
-    q.exec(function (err, players) {
+
+    async.parallel([
+        (cbk) => player.find({ "name.en": { "$regex": term, "$options": "i" } })
+                .select('name pic teamId')
+                .exec(cbk),
+        (cbk) => team.find({ "name.en": { "$regex": term, "$options": "i" } })
+                .select('name logo')
+                .exec(cbk)
+    ], (parallelErr, parallelResults) => {
+        if (parallelErr) {
+            return res.status(500).send(err);
+        }
+
+        const players = parallelResults[0];
+        const teams = parallelResults[1];
+
         players.forEach(function (player) {
             player = player.toObject();
             player.type = "Player";
             tags.push(player);
         });
-
-        var t = team.find({"name.en": { "$regex": term, "$options": "i" }});
-        t.select('name logo');
-        t.exec(function (err, teams) {
-            teams.forEach(function (team) {
-                team = team.toObject();
-                team.type = "Team";
-                tags.push(team);
-            });
-
-            var teamIds = _.map(teams, '_id');
-
-            var m = match.find({$or:[{'home_team': {$in:teamIds}},{'away_team': {$in:teamIds}}]});
-            m.select('home_team away_team start')
-            m.populate('home_team').populate('away_team');
-
-            m.exec(function (err, matches) {
-                matches.forEach(function (match) {
-                    if (match.home_team) {
-                        var matchTag = { name: { en: "" } };
-                        matchTag.name.en = "["+moment(match.start).format('DD/MM')+"]  " +match.home_team.name.en + " - " + match.away_team.name.en;
-                        matchTag._id = match._id;
-                        matchTag.type = "Event";
-                        tags.push(matchTag);
-                    }
-                });
-                return res.send(tags);
-            });
-
+        teams.forEach(function (team) {
+            team = team.toObject();
+            team.type = "Team";
+            tags.push(team);
         });
 
-    });
+        var teamIds = _.map(teams, '_id');
 
+        var m = match.find({ $or: [{ 'home_team': { $in: teamIds } }, { 'away_team': { $in: teamIds } }] });
+        m.select('home_team away_team start');
+        m.populate('home_team').populate('away_team');
+
+        m.exec(function (err, matches) {
+            matches.forEach(function (match) {
+                if (match.home_team) {
+                    var matchTag = { name: { en: "" } };
+                    matchTag.name.en = "[" + moment(match.start).format('DD/MM') + "]  " + match.home_team.name.en + " - " + match.away_team.name.en;
+                    matchTag._id = match._id;
+                    matchTag.type = "Event";
+                    tags.push(matchTag);
+                }
+            });
+            return res.send(tags);
+        });
+    });
 };
 
 api.matchtags = function (req, res) {
@@ -124,18 +130,18 @@ api.matchtags = function (req, res) {
 
     var m = match.findById(mid)
         .select('home_team away_team')
-        .populate('home_team', 'name logo')
-        .populate('away_team', 'name logo');
+        .populate({ path: 'home_team', select: 'abbr name logo', populate: { path: 'players', select: 'shortName name position' } })
+        .populate({ path: 'away_team', select: 'abbr name logo', populate: { path: 'players', select: 'shortName name position' } });
 
     m.exec(function (err, match) {
 
         // First create the match tag
-        if(err || match == null)
-        return res.send(err);
-        
+        if (err || match == null)
+            return res.send(err);
+
         if (match.home_team) {
             var matchTag = { name: { en: "" } };
-            matchTag.name.en = match.home_team.name.en + " - " + match.away_team.name.en;
+            matchTag.name.en = match.name;
             matchTag._id = match._id;
             matchTag.type = "Event";
             matchTags.push(matchTag);
@@ -151,24 +157,21 @@ api.matchtags = function (req, res) {
         away.alias = "away_team";
         matchTags.push(away);
 
-        // And now let's finish it with each team players
-        var q = player.find({ teamId: { $in: [match.home_team._id, match.away_team._id] } });
-        q.select('name pic teamId');
-        q.exec(function (err, players) {
-            players.forEach(function (player) {
-                player = player.toObject();
-                player.type = "Player";
-                matchTags.push(player);
-            });
-
-            return res.send(matchTags);
+        match.home_team.players.forEach(function (player) {
+            player = player.toObject();
+            player.type = "Player";
+            matchTags.push(player);
+        });
+        match.away_team.players.forEach(function (player) {
+            player = player.toObject();
+            player.type = "Player";
+            matchTags.push(player);
         });
 
-
-    })
-
-
+        return res.send(matchTags);
+    });
 };
+
 /*
 =====================  ROUTES  =====================
 */

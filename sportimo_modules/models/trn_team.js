@@ -27,7 +27,7 @@ else {
         updated: { type: Date },
 
         players: [{ type: Schema.Types.ObjectId, ref: 'trn_players' }],
-        shortname: { type: Schema.Types.Mixed }
+        shortName: { type: Schema.Types.Mixed }
     };
 
     var teamSchema = new Schema(team);

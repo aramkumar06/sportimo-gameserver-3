@@ -14,6 +14,9 @@ api.articlesSearch = function(req, res) {
     //  publishDate: { $gt: req.body.minDate, $lt: req.body.maxDate }, type: req.body.type, tags: { "$regex": req.body.tags, "$options": "i" }
     var queries = {};
 
+    if (req.query && req.query.client)
+        queries.client = req.query.client;
+
     if ((req.body.minDate != undefined || req.body.maxDate != undefined) && !req.body.related){
         queries.publishDate = {};
         if (req.body.minDate == req.body.maxDate) {
@@ -53,6 +56,8 @@ api.addarticle = function(req, res) {
     if (req.body == 'undefined') {
         return res.status(400).json('No Article Provided. Please provide valid team data.');
     }
+    if (!req.query || !req.query.client)
+        return res.status(400).json('No Article client Provided. Please provide valid client data.');
 
     var newItem = new article(req.body);
 

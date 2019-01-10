@@ -446,14 +446,14 @@ Parser.prototype.init = function (cbk) {
     let homeTeam = this.matchHandler.home_team;
     homeTeam['matchType'] = 'home_team';
     if (!homeTeam.parserids)
-        return callback(new Error("No parserids[" + this.Name + "]  property in team id " + homeTeam.id + " document in Mongo. Aborting."));
+        return cbk(new Error("No parserids[" + this.Name + "]  property in team id " + homeTeam.id + " document in Mongo. Aborting."));
     this.matchTeamsLookup[homeTeam.parserids[that.Name]] = homeTeam;
 
     // Make a lookup for the home team
     let awayTeam = this.matchHandler.away_team;
     awayTeam['matchType'] = 'away_team';
     if (!awayTeam.parserids)
-        return callback(new Error("No parserids[" + this.Name + "]  property in team id " + awayTeam.id + " document in Mongo. Aborting."));
+        return cbk(new Error("No parserids[" + this.Name + "]  property in team id " + awayTeam.id + " document in Mongo. Aborting."));
     this.matchTeamsLookup[awayTeam.parserids[that.Name]] = awayTeam;
 
     // Execute multiple async functions in parallel getting the player ids and parserids mapping

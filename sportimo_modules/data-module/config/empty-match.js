@@ -1,4 +1,4 @@
- module.exports = {
+module.exports = {
     "sport": "soccer",
     "home_team": "",
     "away_team": "",
@@ -6,29 +6,36 @@
     "away_score": 0,
     "time": "1",
     "start": null,
-    "competition":"",
+    "competition": "",
     "moderation": [],
-     "parserids":[],
     "stats": [],
     "timeline": [],
     "settings": {
+        "gameCards": {
+            "instant": 15,
+            "overall": 15,
+            "specials": 4,
+            "totalcards": 15
+        },
+        "matchRules": {
+            "freeUserPlaySegments": [
+                0,
+                1,
+                2
+            ],
+            "freeUserHasPlayTimeWindow": false,
+            "freeUserPregameTimeWindow": 20,
+            "freeUserLiveTimeWindow": 20,
+            "freeUserAdsToGetCards": false,
+            "freeUserCardsCap": false,
+            "freeUserCardsLimit": 5
+        },
+        "hashtag": "#sportimo",
         "destroyOnDelete": true,
-        "gameCards":{
-            "instant":6,
-            "overall":4,
-            "specials":4
-        },
-        "matchRules" : {
-            "freeUserSegmentsPlay" : [0,1], 
-            "freeUserHasPlayTimeWindow" : true, 
-            "freeUserPregameTimeWindow" : 20, 
-            "freeUserLiveTimeWindow" : 20, 
-            "freeUserAdsToGetCards" : true
-        },
-        "hashtag":"[[match_hashtag]]"
+        "sendPushes": true
     },
     "state": 0
-}
+};
 
 // var match_schema = new mongoose.Schema({
 //   sport: String,
