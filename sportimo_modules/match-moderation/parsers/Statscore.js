@@ -12,7 +12,7 @@ const winston = require('winston');
 const EventEmitter = require('events');
 const MessagingTools = require('../../messaging-tools');
 const SocksConnection = require('../../../socksjs/socksjs'); // require('socksjs');
-const matchFeedStatuses = require('../../models/matchFeedStatus');
+const matchFeedStatuses = require('../../models/matchfeedStatus');
 
 
 var log = new (winston.Logger)({
