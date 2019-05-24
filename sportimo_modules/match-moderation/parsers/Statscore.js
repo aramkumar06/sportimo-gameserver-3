@@ -550,9 +550,10 @@ Parser.prototype.init = function (cbk) {
         if ((moment.utc(scheduleDate) <= itsNow && isActive) || (itsNow >= formattedScheduleDate && itsNow < moment.utc(scheduleDate))) {
             log.info(`[Statscore on ${that.matchHandler.name}]: Queue listener started immediately for matchid ${that.matchHandler.id}`);
             return async.parallel([
-                //(asyncCbk) => { return StartQueueReceiver(that.matchParserId, asyncCbk); },
                 (asyncCbk) => {
-                    StartQueueReceiver(that.matchParserId);
+                    // TODO: Replace back with commented out line below:
+                    // StartQueueReceiver(that.matchParserId);
+                    that.StartQueueReplayer(that.matchParserId);
                     return BookMatch(that.matchParserId, asyncCbk);
                 }
             ], cbk);
@@ -563,7 +564,9 @@ Parser.prototype.init = function (cbk) {
 
                 that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
                     log.info(`[Statscore on ${that.matchHandler.name}]: Scheduled queue listener started for matchid ${that.matchHandler.id}`);
-                    StartQueueReceiver(that.matchParserId);
+                    // TODO: Replace back with commented out line below:
+                    // StartQueueReceiver(that.matchParserId);
+                    that.StartQueueReplayer(that.matchParserId);
                     //MessagingTools.sendPushToAdmins({ en: 'Statscore scheduled feed listener started for matchid: ' + that.matchHandler.id });
                 });
 
