@@ -18,6 +18,7 @@ const mongoose = require('mongoose'),
 // ALL
 api.getAll = function (clientId, skip, limit, cb) {
     var q = Entity.find({ client: clientId });
+    q.populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } });
 
     if (skip !== undefined)
         q.skip(skip * 1);

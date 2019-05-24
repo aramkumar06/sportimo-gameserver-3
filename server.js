@@ -58,6 +58,8 @@ var TestSuite = {
 
 var app = module.exports = exports.app = express();
 var version = "0.9.11";
+
+
 // Create Server
 var server = http.createServer(app);
 var port = (process.env.PORT || 3030);
@@ -221,6 +223,7 @@ try {
             /* Modules */
 
             app.use('/offline_data/', require('./sportimo_modules/offline_data/api/ondemand.js'));
+            app.use('/', require('./sportimo_modules/gamecards/api/gamecards'));
 
             var leaderboards_module = require('./sportimo_modules/leaderpay');
 
@@ -229,6 +232,7 @@ try {
             var data_module = require('./sportimo_modules/data-module');
 
             var polls_module = require('./sportimo_modules/polls');
+
 
             var liveMatches = require('./sportimo_modules/match-moderation');
             if (PublishChannel && SubscribeChannel)
@@ -248,8 +252,6 @@ catch (err) {
 }
 
 // var purchases_module = require('./sportimo_modules/purchases');
-// dataModule.SetupMongoDB(mongoose);
-// dataModule.SetupAPIRoutes(app);
 // TestSuite.dataModule = dataModule;
 
 
@@ -278,7 +280,7 @@ app.use(function (req, res, next) {
 });
 
 app.get('/', function (req, res, next) {
-    res.send(200, "Sportimo main game server v0.9.2 status is live.");
+    res.send(200, "Sportimo main game server v3.0.0 status is live.");
 });
 
 app.use('/static', express.static(__dirname + '/static'));

@@ -14,6 +14,7 @@ else {
         leaderboardDefinition: { type: Schema.Types.ObjectId, ref: 'trn_leaderboard_defs' },
         isHidden: { type: Boolean, default: false },        // when true, the match is not visible by the registered client apps and is reserved for future uses (overrides scheduled_match disabled field)
         visibleInCountries: [String],                       // array of country ISO strings we would like to filter the match visibility for
+        settings: { type: Schema.Types.Mixed },
 
         created: { type: Date, default: Date.now },
         updated: { type: Date, default: Date.now }

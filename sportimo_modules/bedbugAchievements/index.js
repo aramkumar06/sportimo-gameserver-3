@@ -10,8 +10,9 @@ Handler = { Reward: {} };
 
 /**
  * Achievement: persist_gamer
- * This achievement rewards players when they are active
- * at the end of the game.
+ * This achievement rewards players when they are active at the end of the game.
+ *  @param {String} matchid the (scheduled) match id for which users present till the match end will be marked as persistent
+ *  @param {Function} callback the calback function to call at the end
  */
 Handler.Reward.persist_gamer = function (matchid, callback) {
     mongoose.models.trn_user_activities.find({ room: matchid, isPresent: true })
@@ -39,6 +40,11 @@ Handler.Reward.persist_gamer = function (matchid, callback) {
 /**
  * Achievement: update_achievement
  * This method updates the current achievement points for a specific user achievement in the user document
+ *  @param {String} userId the user id
+ *  @param {String} achievementUId the id of the pertinent achievement document in the achievements collection
+ *  @param {Number} achievementQuantity how many achievements the user has completed
+ *  @param {Function} callback the calback function to call at the end
+ *  @returns {null} nothing special
  */
 Handler.Reward.update_achievement = function (userId, achievementUId, achievementQuantity, callback) {
     return mongoose.models.users.addAchievementPoint(userId, { uniqueid: achievementUId, value: achievementQuantity }, callback);
@@ -51,245 +57,183 @@ Handler.Reward.update_achievement = function (userId, achievementUId, achievemen
  *  
  * @param {String} matchid the (scheduled match) id
  * @param {Function} outerCallback a callback function
- * @returns {null} nothing
  */
 Handler.Reward.rank_achievements = function (matchid, outerCallback) {
+
     console.log("Calculating and sending rank achievements");
+    const Leaderboard = require('../data-module/apiObjects/leaderboard');
 
-    return outerCallback(null);
-    /*
+    // get all tournament matches, along with their referenced tournaments
+
     async.waterfall([
-
-        (callback) => {
-            return async.parallel([
-                // First we must find all leaderboards for the matchid
-                (cbk) => mongoose.models.trn_leaderboard_defs
-                    .find({ gameid: matchid })
-                    .populate('tournament')
-                    .populate('tournamentMatch')
-                    .exec(cbk),
-                (cbk) => mongoose.models.trn_server_settings.findOne({}, cbk),
-                //(cbk) => mongoose.models.matches
-                //        .findById(matchid, '_id disabled start home_team away_team home_score away_score')
-                //        .populate('_id home_team away_team', 'name')
-                //        .exec(cbk)
-            ], callback);
+        (cbk) => {
+            return mongoose.models.trn_matches.find({ match: matchid })
+                .populate({ path: 'tournament', match: { state: 'active' } })
+                .populate('leaderboardDefinition')
+                .populate({ path: 'match', select: '-stats -timeline', populate: [{ path: 'home_team', select: 'name' }, { path: 'away_team', select: 'name' }] })
+                .exec(cbk);
         },
-        // Get all leaderboards from match pools, assign arrays with player positions
-        (parallelResults, callback) => {
+        (trnMatches, cbk) => {
+            const eligibleTrnMatches = _.filter(trnMatches, (tm) => !(!tm.match || !tm.tournament));
 
-            const pools = parallelResults[0];
-            const serverSettings = parallelResults[1];
-            const match = parallelResults[2];
-            var top1s = [];
-            var top10s = [];
-            var top100s = [];
-            var loosers = [];
+            if (!eligibleTrnMatches || eligibleTrnMatches.length === 0)
+                return cbk(null);
 
-            var pushNotifications = serverSettings.pushNotifications;
+            async.each(eligibleTrnMatches, (trnMatch, trnCbk) => {
 
-            if (pools.length === 0) 
-                pools[0] = { game_id: matchid };
+                const match = trnMatch.match;
 
-            var matchName = { en: '', ar: '' };
+                // Determine the match name
+                let matchName = { en: '', ar: '' };
 
-            if (match.home_team && match.home_team.name && match.home_team.name.en)
-                matchName.en += match.home_team.name.en;
-            else matchName.en += 'Home team';
-            matchName.en += ' ' + match.home_score + ' - ' + match.away_score + ' ';
-            if (match.away_team && match.away_team.name && match.away_team.name.en)
-                matchName.en += match.away_team.name.en;
-            else matchName.en += 'Away team';
+                if (match.home_team && match.home_team.name && match.home_team.name.en)
+                    matchName.en += match.home_team.name.en;
+                else matchName.en += 'Home team';
+                matchName.en += ' ' + match.home_score + ' - ' + match.away_score + ' ';
+                if (match.away_team && match.away_team.name && match.away_team.name.en)
+                    matchName.en += match.away_team.name.en;
+                else matchName.en += 'Away team';
 
-            if (match.home_team && match.home_team.name && match.home_team.name.ar)
-                matchName.ar += match.home_team.name.ar;
-            else matchName.ar += 'Home team';
-            matchName.ar += ' ' + match.home_score + ' - ' + match.away_score + ' ';
-            if (match.away_team && match.away_team.name && match.away_team.name.ar)
-                matchName.ar += match.away_team.name.ar;
-            else matchName.ar += 'Away team';
+                if (match.home_team && match.home_team.name && match.home_team.name.ar)
+                    matchName.ar += match.home_team.name.ar;
+                else matchName.ar += 'Home team';
+                matchName.ar += ' ' + match.home_score + ' - ' + match.away_score + ' ';
+                if (match.away_team && match.away_team.name && match.away_team.name.ar)
+                    matchName.ar += match.away_team.name.ar;
+                else matchName.ar += 'Away team';
 
-            var poolsCount = pools.length;
-            return async.eachLimit(pools, 500, function (pool, poolCbk) {
 
-                var parsedPool = parseConditons(pool);
-                var q = mongoose.models.scores.aggregate({
-                    $match: parsedPool
-                });
+                async.waterfall([
+                    (innerCbk) => Leaderboard.getMatchLeaders(trnMatch.client, trnMatch.tournament, trnMatch.id, innerCbk),
+                    (leaders, innerCbk) => {
 
-                q.sort({ score: -1 });
-                var usersCount = 0;
+                        // What if leaders is empty, when there is no match leaderboard set?
 
-                q.exec(function (err, leaderboard) {
-                    if (err)
-                        console.log(err);
-                    if (!leaderboard || leaderboard.length == 0)
-                        return poolCbk(null);
+                        let top1s = [];
+                        let top10s = [];
+                        let top100s = [];
+                        let loosers = [];
 
-                    // return async.eachOfSeries(leaderboard, (user, usersCount, userCbk) => {
-                    return async.eachSeries(leaderboard, function (user, userCbk) {
-
-                        // Update Best Rank for User
-                        mongoose.models.users.updateRank(user.user_id, { rank: (usersCount + 1), matchid: matchid }, function (err, result) {
-                            if (err) {
-                                console.log(err);
-                            }
-                            else {
-                                if (usersCount == 0 && user.score > 0) {
-                                    //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${usersCount + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                    top1s.push(user.user_id.toString());
+                        async.eachOfLimit(leaders, 100, (leader, leaderIndex, innermostCbk) => {
+                            // Update Best Rank for User
+                            mongoose.models.users.updateRank(leader._id, { rank: (leaderIndex + 1), matchid: matchid }, function (err, result) {
+                                if (err) {
+                                    console.log(err);
                                 }
-                                if (usersCount > 0 && usersCount < 10 && user.score > 0) {
-                                    //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${usersCount + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                    top10s.push(user.user_id.toString());
-                                }
-                                if (usersCount >= 10 && usersCount < 100 && user.score > 0) {
-                                    //MessagingTools.sendPushToUsers(user.user_id, { en: `You ranked #${usersCount + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                    top100s.push(user.user_id.toString());
-                                }
-                                if (usersCount >= 100 && user.score > 0) {
-                                    //MessagingTools.sendPushToUsers(user.user_id, { en: `You won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                    loosers.push(user.user_id.toString());
-                                }
+                                else {
+                                    if (leaderIndex === 0 && user.score > 0) {
+                                        //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
+                                        top1s.push(user.user_id.toString());
+                                    }
+                                    if (leaderIndex > 0 && leaderIndex < 10 && user.score > 0) {
+                                        //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
+                                        top10s.push(user.user_id.toString());
+                                    }
+                                    if (leaderIndex >= 10 && leaderIndex < 100 && user.score > 0) {
+                                        //MessagingTools.sendPushToUsers(user.user_id, { en: `You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
+                                        top100s.push(user.user_id.toString());
+                                    }
+                                    if (leaderIndex >= 100 && user.score > 0) {
+                                        //MessagingTools.sendPushToUsers(user.user_id, { en: `You won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
+                                        loosers.push(user.user_id.toString());
+                                    }
 
-                                if (usersCount >= 0 && usersCount < 3 && user.score > 0) {
-                                    var msgG5 = {
-                                        en: `Congrats! You ranked #${usersCount + 1} and won ${user.score} points in ${matchName.en}`,
-                                        ar: `مبروك!
-أنت في المرتبة ${usersCount + 1}  وقد كسبت ${user.score} نقطة في مباراة ${matchName.ar}`
-                                    };
+                                    if (leaderIndex >= 0 && leaderIndex < 3 && user.score > 0) {
+                                        var msgG5 = {
+                                            en: `Congrats! You ranked #${leaderIndex + 1} and won ${user.score} points in ${matchName.en}`,
+                                            ar: `مبروك!
+أنت في المرتبة ${leaderIndex + 1}  وقد كسبت ${user.score} نقطة في مباراة ${matchName.ar}`
+                                        };
 
-                                    // Send push notification to users with their rank and score.
-                                    if (!match.disabled) {
-                                        if (pushNotifications && pushNotifications.G5) {
-                                            logger.log('info', `[${matchName.en}]: Sending leaderboard G5 notification to user: ${user.user_id}`);
-                                            MessagingTools.sendPushToUsers([user.user_id], msgG5, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
+                                        // Send push notification to users with their rank and score.
+                                        if (!trnMatch.isHidden && !match.disabled) {
+                                            if (pushNotifications && pushNotifications.G5) {
+                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G5 notification to user: ${user.user_id}`);
+                                                MessagingTools.sendPushToUsers([user.user_id], msgG5, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
+                                            }
+                                        }
+                                    }
+                                    if (leaderIndex > 2 && leaderIndex < 10 && user.score > 0) {
+                                        var msgG6 = {
+                                            en: `You ranked #${leaderIndex + 1} and won ${user.score} points in ${matchName.en}`,
+                                            ar: `أنت في المرتبة ${leaderIndex + 1}  وقد كسبت ${user.score} نقطة في مباراة ${matchName.ar}`
+                                        };
+
+                                        // Send push notification to users with their rank and score.
+                                        if (!trnMatch.isHidden && !match.disabled) {
+                                            if (pushNotifications && pushNotifications.G6) {
+                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G6 notification to user: ${user.user_id}`);
+                                                MessagingTools.sendPushToUsers([user.user_id], msgG6, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
+                                            }
                                         }
                                     }
                                 }
-                                if (usersCount > 2 && usersCount < 10 && user.score > 0) {
-                                    var msgG6 = {
-                                        en: `You ranked #${usersCount + 1} and won ${user.score} points in ${matchName.en}`,
-                                        ar: `أنت في المرتبة ${usersCount + 1}  وقد كسبت ${user.score} نقطة في مباراة ${matchName.ar}`
-                                    };
 
-                                    // Send push notification to users with their rank and score.
-                                    if (!match.disabled) {
-                                        if (pushNotifications && pushNotifications.G6) {
-                                            logger.log('info', `[${matchName.en}]: Sending leaderboard G6 notification to user: ${user.user_id}`);
-                                            MessagingTools.sendPushToUsers([user.user_id], msgG6, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
-                                        }
-                                    }
-                                }
+
+                                return innermostCbk(null);
+                            });
+                        }, (leadersErr) => {
+                            if (leadersErr) {
+                                logger.error(`Error while calculating the rank achievements after the match ${trnMatch.match.name}: ${leadersErr.stack}`);
                             }
-
-                            usersCount++;
-
-                            return userCbk(null);
+                            return innerCbk(null, top1s, top10s, top100s, loosers);
                         });
+                    },
+                    (top1s, top10s, top100s, loosers, innerCbk) => {
 
-                    }, poolCbk);
-                });
-            }, () => {
-                return callback(null, top1s, top10s, top100s, loosers);
-            });
-        },
-        function (top1s, top10s, top100s, loosers, callback) {
+                        var concat10s = _.concat(top1s, top10s);
+                        var concat100s = _.concat(concat10s, top100s);
 
-            var concat10s = _.concat(top1s, top10s);
-            var concat100s = _.concat(concat10s, top100s);
+                        async.parallel([
+                            (pcbk) => {
 
-            async.parallel([
-                (cbk) => {
+                                if (top1s.length > 0) {
+                                    async.eachLimit(top1s, 500, function (userId, innerpCbk) {
+                                        return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'mike_drop', value: 1 }, innerpCbk);
+                                    }, pcbk);
+                                }
+                                else
+                                    return async.setImmediate(() => { pcbk(null); });
+                            },
+                            (pcbk) => {
 
-                    if (top1s.length > 0) {
-                        async.eachLimit(top1s, 500, function (userId, innerCbk) {
-                            return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'mike_drop', value: 1 }, innerCbk);
-                        }, cbk);
+                                if (concat10s.length > 0) {
+                                    async.eachLimit(concat10s, 500, function (userId, innerpCbk) {
+                                        return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'top_10', value: 1 }, innerpCbk);
+                                    }, pcbk);
+                                }
+                                else
+                                    return async.setImmediate(() => { pcbk(null); });
+                            },
+                            (pcbk) => {
+
+                                if (concat100s.length > 0) {
+                                    async.eachLimit(concat100s, 500, function (userId, innerpCbk) {
+                                        return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'top_100', value: 1 }, innerpCbk);
+                                    }, pcbk);
+                                }
+                                else
+                                    return async.setImmediate(() => { pcbk(null); });
+                            }
+                            //(pcbk) => {
+
+                            //    if (loosers.length > 0)
+                            //        async.eachLimit(loosers, 500, function (userId, innerpCbk) {
+                            //            return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'loosers_reward', value: 1 }, innerpCbk);
+                            //        }, pcbk);
+                            //    else
+                            //        return async.setImmediate(() => { pcbk(null); });
+                            //}
+                        ], innerCbk);
+
                     }
-                    else
-                        return async.setImmediate(() => { cbk(null); });
-                },
-                (cbk) => {
+                ], trnCbk);
 
-                    if (concat10s.length > 0) {
-                        async.eachLimit(concat10s, 500, function (userId, innerCbk) {
-                            return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'top_10', value: 1 }, innerCbk);
-                        }, cbk);
-                    }
-                    else
-                        return async.setImmediate(() => { cbk(null); });
-                },
-                (cbk) => {
+            }, cbk);
+        }
+    ], outerCallback);
 
-                    if (concat100s.length > 0) {
-                        async.eachLimit(concat100s, 500, function (userId, innerCbk) {
-                            return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'top_100', value: 1 }, innerCbk);
-                        }, cbk);
-                    }
-                    else
-                        return async.setImmediate(() => { cbk(null); });
-                }
-                //(cbk) => {
-
-                //    if (loosers.length > 0)
-                //        async.eachLimit(loosers, 500, function (userId, innerCbk) {
-                //            return mongoose.models.users.addAchievementPoint(userId, { uniqueid: 'loosers_reward', value: 1 }, innerCbk);
-                //        }, cbk);
-                //    else
-                //        return async.setImmediate(() => { cbk(null); });
-                //}
-            ], callback);
-
-        }],
-        function (err, result) {
-            if (outerCallback)
-                outerCallback(err, result);
-        });
-    */
-}
+};
 
 
 module.exports = Handler;
-
-
-function parseConditons(conditions) {
-
-    // Conditions is not a Pool Room
-    if (conditions.conditions) {
-        var conditions = conditions.conditions;
-        if (conditions.created) {
-            if (conditions.created.$gt)
-                conditions.created.$gt = new Date(conditions.created.$gt);
-            if (conditions.created.$gte)
-                conditions.created.$gte = new Date(conditions.created.$gte);
-            if (conditions.created.$lte)
-                conditions.created.$lte = new Date(conditions.created.$lte);
-            if (conditions.created.$lt)
-                conditions.created.$lt = new Date(conditions.created.$lt);
-        }
-        return conditions;
-    }
-
-    var parsed_conditions = {};
-
-    if (conditions.game_id) {
-        parsed_conditions.game_id = conditions.game_id;
-    }
-    else if (conditions.gameid)
-        parsed_conditions.game_id = conditions.gameid;
-    else {
-        parsed_conditions.created = {};
-        if (conditions.starts)
-            parsed_conditions.created.$gte = new Date(conditions.starts);
-        if (conditions.ends)
-            parsed_conditions.created.$lte = new Date(conditions.ends);
-    }
-
-    // if (conditions.country)
-    //     if (conditions.country.length > 0 && conditions.country[0] != "All")
-    //         parsed_conditions.country = { "$in": conditions.country };
-
-    return parsed_conditions;
-
-}

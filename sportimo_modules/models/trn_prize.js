@@ -8,6 +8,7 @@ if (mongoose.models.trn_prizes)
     module.exports = mongoose.models.trn_prizes;
 else {
     var fields = {
+        client: { type: ObjectId, ref: 'trn_clients' },
         name: { type: Schema.Types.Mixed },
         text: { type: Schema.Types.Mixed },
         picture: { type: String },

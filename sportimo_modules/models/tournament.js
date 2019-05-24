@@ -26,6 +26,7 @@ else {
         subscriptionPrice: { type: Number },    // in Golden Tickets
         //subscriptionPolicy: { type: String, enum: ['free', 'goldTickets'] },
         leaderboardDefinition: { type: ObjectId, ref: 'trn_leaderboard_defs' },
+        settings: { type: Schema.Types.Mixed },
         created: { type: Date, default: Date.now },
         updated: { type: Date, default: Date.now }
     };

@@ -10,7 +10,6 @@ var mongoose = require('mongoose'),
     api = {};
 
 
-
 /*
 ========= [ CORE METHODS ] =========
 */
@@ -18,7 +17,7 @@ var mongoose = require('mongoose'),
 // ALL
 api.getAll = function (tournamentId, skip, limit, cb) {
     var q = Entity.find({ tournament: tournamentId });
-    q.populate({ path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] });
+    q.populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }]);
 
     if (skip !== undefined)
         q.skip(skip * 1);
@@ -38,7 +37,7 @@ api.getAll = function (tournamentId, skip, limit, cb) {
 api.getById = function (tournamentId, id, cb) {
     Entity
         .findOne({ _id: id, tournament: tournamentId })
-        .populate('match')
+        .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }])
         .exec(function (err, entity) {
             if (entity && tournamentId !== entity.tournament)
                 err = new Error(`Conflict between the path-provided tournamentId and tournament's referred tournament id`);
@@ -49,8 +48,9 @@ api.getById = function (tournamentId, id, cb) {
 
 
 // Returns results matching the searchTerm
-api.search = function (tournamentId, searchTerm, cb) {
-    const searchExp = new RegExp(searchTerm, 'i');
+api.search = function (tournamentId, searchExp, cb) {
+
+    const searchTerm = new RegExp(searchExp, 'i');
 
     async.waterfall([
         (cbk) => {
@@ -73,7 +73,9 @@ api.search = function (tournamentId, searchTerm, cb) {
                 tournament: tournamentId,
                 match: { $in: matchIds }
             };
-            Entity.find(query, cbk);
+            Entity.find(query)
+            .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }])
+            .exec(cbk);
         }
     ], (parallelErr, results) => {
         cbf(cb, parallelErr, results);
@@ -87,7 +89,11 @@ api.add = function (entity, cb) {
 
 
     if (!entity || !entity.client || !entity.tournament || !entity.home_team || !entity.away_team || !entity.start || !entity.season) {
-        cb('No (valid) entity provided. Please provide valid data to insert.');
+        return cb('No (valid) entity provided. Please provide valid data to insert.');
+    }
+
+    if (!entity.name) {
+        entity.name = `${entity.home_team.name && entity.home_team.name.en ? entity.home_team.name.en : 'home_team'} - ${entity.away_team.name && entity.away_team.name.en ? entity.away_team.name.en : 'away_team'}`;
     }
 
     // Rectify id refs
@@ -96,15 +102,19 @@ api.add = function (entity, cb) {
     if (entity.away_team._id)
         entity.away_team = entity.away_team._id;
 
-    if (!entity.name) {
-        entity.name = `${entity.home_team.name && entity.home_team.name.en ? entity.home_team.name.en : 'home_team'} - ${entity.away_team.name && entity.away_team.name.en ? entity.away_team.name.en : 'away_team'}`;
-    }
+    if (!entity.disabled)
+        entity.disabled = false;
+
+    let leaderboardTemplate = null;
 
     async.waterfall([
-        (cbk) => {
+        (cbk) => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }, cbk),
+        (templates, cbk) => {
             // Try finding the referrenced match, if existing already in the matches collection
 
             const matchQuery = {};
+            if (templates && templates.length > 0)
+                leaderboardTemplate = templates[0];
 
             if (entity.moderation && entity.moderation.length > 0) {
                 matchQuery.$or = [];
@@ -128,28 +138,54 @@ api.add = function (entity, cb) {
             if (matches && matches.length > 0) {
                 entity.match = matches[0];
 
-                return cbk(null, entity.match);
+                return cbk(null, entity.match, 0);
             }
             else {
                 const newMatch = new Match(entity);
                 return newMatch.save(cbk);
             }
         },
-        (savedMatch, cbk) => {
+        (savedMatch, savedQuantity, cbk) => {
 
-            if (!entity.match)
+           if (!entity.match)
                 entity.match = savedMatch;
 
             const tMatch = new Entity(entity);
 
-            return tMatch.save(cbk);
+            if (leaderboardTemplate) {
+                // Create a leaderboardDefinition as well
+                const leaderboardDef = new mongoose.models.trn_leaderboard_defs({
+                    client: tMatch.client,
+                    tournament: tMatch.tournament,
+                    tournament_match: tMatch,
+                    match: tMatch.match,
+                    title: leaderboardTemplate.title,
+                    info: leaderboardTemplate.info,
+                    active: true,
+                    bestscores: leaderboardTemplate.bestscores,
+                    prizes: leaderboardTemplate.prizes
+                });
+                tMatch.leaderboardDefinition = leaderboardDef;
+            }
+
+            return async.parallel([
+                (icbk) => tMatch.save(icbk),
+                (icbk) => {
+                    if (leaderboardTemplate && tMatch.leaderboardDefinition) {
+                        return tMatch.leaderboardDefinition.save(icbk);
+                    }
+                    else
+                        return async.setImmediate(() => icbk(null));
+                }],
+                cbk);
         }
-    ], (waterfallErr, savedMatch) => {
+    ], (waterfallErr, parallelResults) => {
         if (waterfallErr)
             return cb(waterfallErr);
 
-        const MatchModeration = require('../../match-moderation');
+        const savedMatch = parallelResults[0][0];
 
+        const MatchModeration = require('../../match-moderation');
         MatchModeration.LoadMatchFromDB(savedMatch.id, function (err) {
             return savedMatch.populate('match', cb);
         });

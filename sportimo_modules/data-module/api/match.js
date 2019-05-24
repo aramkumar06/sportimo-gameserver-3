@@ -141,6 +141,22 @@ var TranslateUserGamecard = function (userGamecard) {
 };
 
 
+
+api.tournaments = function (req, res) {
+
+    const matchId = req.params.gameid;
+
+    TournamentMatches.find({ match: matchId })
+        .populate(client)
+        .populate(tournament)
+        .exec((err, trnMatches) => {
+            if (err)
+                return res.status(500).json({ err: err.stack });
+
+            return res.status(200).json(trnMatches);
+        });
+};
+
 // POST
 api.updateHeadToHead = function (req, res) {
 
@@ -167,6 +183,9 @@ api.updateHeadToHead = function (req, res) {
 
 router.route('/v1/data/match/:gameid/user/:userid/')
     .get(api.item);
+
+router.route('/v1/data/match/:gameid/tournaments')
+    .get(api.tournaments);
 
 router.route('/v1/data/match/:gameid/user/:userid/:trimby')
     .get(api.item);

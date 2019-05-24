@@ -27,8 +27,7 @@ var path = require('path'),
     log = require('winston'),
     _ = require('lodash'),
     bodyParser = require('body-parser'),
-    mongoose = require('mongoose'),
-    achievements = require('../bedbugAchievements');
+    mongoose = require('mongoose');
 
 /* Module to handle user feedback */
 var MessagingTools = require('../messaging-tools');
@@ -231,9 +230,15 @@ gamecards.getDefinitions = function (state, callback) {
 };
 
 // Added a new method because the old one returned only active ones and there was no sign of match id filtering
-gamecards.getMatchDefinitions = function (mid, callback) {
+gamecards.getMatchDefinitions = function (mid, client, tournament, callback) {
 
-    db.models.trn_card_definitions.find({ matchid: mid }, function (error, data) {
+    const query = { matchid: mid };
+    if (client)
+        query.client = client;
+    if (tournament)
+        query.tournament = tournament;
+
+    db.models.trn_card_definitions.find(query, function (error, data) {
         if (error)
             return callback(error);
         callback(null, data);
@@ -1683,6 +1688,9 @@ gamecards.HandleUserCardRewards = function (uid, mid, cardType, cardPrimaryStat,
             });
         },
         (cbk) => {
+            
+            var achievements = require('../bedbugAchievements');
+
             // Reward Achievements for certain types and primary Stats of cards
             // All conditions used to be if (cardType != 'Overall' && ... but we due to having red cards only as Overall cards, we removed this
             if (cardPrimaryStat == 'Goal' && cardMinute && cardMinute > 75) {

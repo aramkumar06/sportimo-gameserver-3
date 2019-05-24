@@ -1,11 +1,11 @@
-'use strict';
+﻿'use strict';
 
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema,
     ObjectId = Schema.Types.ObjectId;
 
-if (mongoose.models.trn_leaderboard_defs)
-    module.exports = mongoose.models.trn_leaderboard_defs;
+if (mongoose.models.trn_leaderboard_templates)
+    module.exports = mongoose.models.trn_leaderboard_templates;
 else {
 
     var positionType = new Schema({
@@ -37,5 +37,5 @@ else {
 
     var leaderboardDefSchema = new Schema(leaderboarddef);
 
-    module.exports = mongoose.model('trn_leaderboard_defs', leaderboardDefSchema);
+    module.exports = mongoose.model('trn_leaderboard_templates', leaderboardDefSchema);
 }

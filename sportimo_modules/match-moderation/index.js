@@ -288,22 +288,54 @@ var ModerationModule = {
         var match = ModerationModule.ModeratedTmatchLookup[tmatchId];
 
         if (match) {
-            if (cbk)
-                cbk(null, match);
-            else
-                return match;
+            return cbk ? cbk(null, match) : match;
         } else {
             ModerationModule.LoadMatchFromDB(tmatchId, cbk);
         }
     },
     GetMatch: function (matchId, cbk) {
-        tournamentMatches.findOne({ match: matchId }, (err, match) => {
-            if (err) {
-                return cbk ? cbk(err) : err;
-            }
+        const tMatchIds = ModerationModule.ModeratedMatchLookup[matchId];
 
-            return ModerationModule.GetTournamentMatch(match.id, cbk);
-        });
+        if (!tMatchIds || tMatchIds.length === 0) {
+            if (!cbk)
+                return null;
+
+            tournamentMatches.findOne({ match: matchId }, '_id', (err, tMatch) => {
+                if (err)
+                    return cbk(err);
+
+                return ModerationModule.GetTournamentMatch(tMatch.id, cbk);
+            });
+        }
+        else {
+            if (!cbk)
+                return ModerationModule.GetTournamentMatch(tMatchIds[0].id);
+
+            return ModerationModule.GetTournamentMatch(tMatchIds[0].id, cbk);
+        }
+    },
+    GetTournamentMatches: function (matchId, client, cbk) {
+        const tMatches = ModerationModule.ModeratedMatchLookup[matchId];
+
+        if (!tMatches || tMatches.length === 0) {
+            return cbk ? cbk(null, tMatches) : tMatches;
+        }
+        else {
+            const query = { match: matchId };
+            if (client)
+                query.client = client;
+
+            tournamentMatches.find(query)
+                .populate('client')
+                .populate('tournament')
+                .exec((err, tMatches) => {
+                    if (err) {
+                        return cbk ? cbk(err) : err;
+                    }
+
+                    return cbk ? cbk(null, tMatches) : tMatches;
+                });
+        }
     },
     // the tournamentMatch includes both tournament refs and the match in its match property, while the hookedMatch includes in its data property the match only
     InsertInLookup: function (tournamentMatch) {

@@ -82,8 +82,9 @@ var UserSchema = new Schema(
         unread: { type: Number, default: 1 },
         social_id: {
             type: String,
-            unique: true,
-            required: false
+            //unique: true,
+            required: false,
+            sparse: true
         },
         // The following field is going to be used for the single frictionless sign on
         social_ids: {

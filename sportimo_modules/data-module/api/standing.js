@@ -2,11 +2,11 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    item = mongoose.models.standings,
+    item = mongoose.models.trn_standings,
     logger = require('winston'),
     api = {};
 var knockouts = mongoose.models.knockoutStandings,
-    competitions = mongoose.models.competitions;
+    competitions = mongoose.models.trn_competitions;
 
 
 api.items = function (req, res) {

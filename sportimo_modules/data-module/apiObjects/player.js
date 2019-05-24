@@ -89,7 +89,7 @@ api.search = function (searchTerm, teamId, cb) {
 
 };
 
-api.getByTeam = function (teamid, cb) {
+api.getByTeam = function (teamId, cb) {
 
     Team
         .findOne({ _id: teamId })

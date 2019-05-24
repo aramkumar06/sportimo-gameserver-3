@@ -1,7 +1,8 @@
 var express = require('express'),
     router = express.Router(),
     log = require('winston'),
-    _ = require('lodash');
+    _ = require('lodash'),
+    async = require('async');
 
 module.exports = function (ModerationModule) {
 
@@ -58,14 +59,22 @@ module.exports = function (ModerationModule) {
 
 
     router.get('/v1/live/match/:id', function (req, res) {
-        ModerationModule.GetMatch(req.params.id, function (err, match) {
 
+        async.parallel([
+            (cbk) => ModerationModule.GetMatch(req.params.id, cbk),
+            (cbk) => ModerationModule.GetTournamentMatches(req.params.id, req.query.client, cbk)
+        ], (err, parallelResults) => {
+
+            const match = parallelResults[0];
+            const tMatches = parallelResults[1];
             try {
                 var strippedMatch = _.cloneDeep(match);
                 if (strippedMatch.Timers)
                     delete strippedMatch.Timers;
                 if (strippedMatch.services)
                     delete strippedMatch.services;
+
+                strippedMatch.tournamentMatches = tMatches;
 
                 // console.log("actual " +strippedMatch.data.moderation[0].start);
                 if (!err)
@@ -75,6 +84,7 @@ module.exports = function (ModerationModule) {
                 return res.send(err);
             }
         });
+
     });
 
     // Set up manual Moderation Routes

@@ -1,11 +1,8 @@
 var express = require('express'),
     router = express.Router(),
     log = require('winston'),
-    moment = require('moment');
-
-
-module.exports = function (gamecardModule) {
-
+    moment = require('moment'),
+    gamecardModule = require('../index');
 
 
     // Used to test easily award handling on gamecard wins
@@ -91,8 +88,9 @@ module.exports = function (gamecardModule) {
     
     // Get existing definition gamecards for a specific matchId
     // Used only by the dashboard. Removes complex response for easier mapping.
-    router.get('/v1/gamecards/:matchId/matchdefinitions', function(req, res) {
-        gamecardModule.getMatchDefinitions(req.params.matchId, function(error, data) {
+router.get('/v1/gamecards/:matchId/matchdefinitions', function (req, res) {
+
+        gamecardModule.getMatchDefinitions(req.params.matchId, req.query.client, req.query.tournament, function(error, data) {
             if (error)
                 return res.status(400).json(error);
             res.status(200).json(data);
@@ -225,5 +223,4 @@ module.exports = function (gamecardModule) {
     });
 
 
-    return router;
-};
+module.exports = router;

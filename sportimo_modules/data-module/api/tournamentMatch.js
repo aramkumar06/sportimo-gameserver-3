@@ -51,8 +51,8 @@ router.post('/v1/data/matches', (req, res) => {
 
     entity.add(req.body, function (err, data) {
         if (err) {
-            res.status(500).json(err);
             logger.log('error', err.stack, req.body);
+            res.status(500).json(err);
         }
         else {
             res.status(201).json(data);

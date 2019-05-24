@@ -12,6 +12,7 @@ const winston = require('winston');
 const EventEmitter = require('events');
 const MessagingTools = require('../../messaging-tools');
 const SocksConnection = require('../../../socksjs/socksjs'); // require('socksjs');
+const matchFeedStatuses = require('../../models/matchFeedStatus');
 
 
 var log = new (winston.Logger)({
@@ -628,16 +629,66 @@ Parser.prototype.StartQueueReplayer = function (matchParserId, matchParserEventI
                 cbk(null);
         });
     });
-}
+};
+
+
+Parser.prototype.GetMatchFeedStatusFeed = function (matchId, callback) {
+
+    const that = this;
+
+    matchFeedStatuses.findOne({ matchid: matchId }, { ['diffed_events.' + that.Name]: 1 }, (err, matchFeedStatus) => {
+        if (err)
+            return callback(err);
+
+        if (!matchFeedStatus || !matchFeedStatus.diffed_events || !matchFeedStatus.diffed_events[that.Name])
+            return callback(null, []);
+
+        const allEvents = matchFeedStatus.diffed_events[that.Name];
+        return callback(null, allEvents);
+    });
+};
+
+
+
+Parser.prototype.StartMatchFeedReplayer = function (matchParserId, matchParserEventIds, callback) {
+    const that = this;
+    const matchParserEventIdLookup = _.mapValues(matchParserEventIds, true);
+
+    that.GetMatchFeedStatusFeed(matchParserId, (err, allEvents) => {
+        if (err) {
+            log.error(err.message);
+            return callback(error);
+        }
+
+        // order events chronologically by its utc epoch (ut property)
+        allEvents = _.sortBy(allEvents, 'ut');
+        //allEvents = _.reverse(allEvents);
+
+        allEvents = _.filter(allEvents, (e) => { return !matchParserEventIdLookup[TranslateEventMessageId(e)]; });
+
+        async.eachSeries(allEvents, (event, cbk) => {
+            if (that.feedService)
+                setTimeout(() => {
+                    Emitter.emit('event', event);
+                    cbk(null);
+                }, 300);
+            else
+                cbk(null);
+        });
+
+        return callback(null);
+    });
+};
+
 
 
 Parser.prototype.Pause = () => {
     this.isPaused = true;
-}
+};
 
 Parser.prototype.Resume = () => {
     this.isPaused = false;
-}
+};
 
 
 

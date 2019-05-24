@@ -1724,13 +1724,13 @@ apiRoutes.get('/v1/users/update/achievements/:recalculate', function (req, res) 
         } else {
             return res.send({ success: true });
         }
-    })
+    });
 
     function recalculate() {
 
         if (recalc == "true") {
             console.log("Recalculating: " + req.params.recalculate);
-            User.find({ deletedAt: null}, function (err, allUsers) {
+            User.find({ deletedAt: null }, function (err, allUsers) {
                 _.each(allUsers, function (eachUser) {
                     var total = _.sumBy(eachUser.achievements, function (o) {
                         return _.multiply(o.total, o.value);
@@ -1744,8 +1744,8 @@ apiRoutes.get('/v1/users/update/achievements/:recalculate', function (req, res) 
 
                     eachUser.level = has / total;
                     eachUser.save(function (err, result) { });
-                })
-            })
+                });
+            });
         }
     }
 
@@ -1754,12 +1754,21 @@ apiRoutes.get('/v1/users/update/achievements/:recalculate', function (req, res) 
 
 // Search users abses on string and return list of mini user objects
 apiRoutes.get('/v1/users/search/:val', function (req, res) {
-    User.find({ $or: [{ "username": { "$regex": req.params.val, "$options": "i" } }, { "email": { "$regex": req.params.val, "$options": "i" } }], deletedAt: null })
+
+    const query = {
+        $or: [{ "username": { "$regex": req.params.val, "$options": "i" } }, { "email": { "$regex": req.params.val, "$options": "i" } }],
+        deletedAt: null
+    };
+
+    if (req.query && req.query.client)
+        query.client = req.query.client;
+
+    User.find(query)
         .select('username email')
         .limit(20)
         .exec(function (err, docs) {
             res.send(docs);
-        })
+        });
 });
 
 //Sends message to routers
@@ -1792,7 +1801,7 @@ apiRoutes.get('/v1/users/:id/messages', function (req, res) {
             });
         } else
             res.status(500).send(err);
-    })
+    });
 });
 
 // Delete message from user
@@ -1977,15 +1986,15 @@ apiRoutes.get('/v1/users/:uid/block/:buid/:state', function (req, res) {
             result.save(function (err, result) {
 
                 if (!err)
-                    return res.send({ "blocked": req.params.state })
+                    return res.send({ "blocked": req.params.state });
                 else
                     return res.status(500).send(err);
-            })
+            });
 
 
         } else
             res.status(500).send(err);
-    })
+    });
 
 
 
@@ -2031,7 +2040,11 @@ apiRoutes.post('/v1/users/:id/subscription', function (req, res) {
 
 apiRoutes.get('/v1/users/activity/:matchid', function (req, res) {
 
-    UserActivities.find({ room: req.params.matchid })
+    const query = { room: req.params.matchid };
+    if (req.query && req.query.client)
+        query.client = req.query.client;
+
+    UserActivities.find(query)
         .populate('user')
         // .populate('away_team', 'name logo')
         .exec(function (err, users) {
@@ -2142,8 +2155,13 @@ apiRoutes.get('/v1/users/:uid/stats', function (req, res) {
 // @@   User Segmentation / Targeting
 
 apiRoutes.get('/v1/users/segments/countries', function (req, res) {
+
+    const matchQuery = { country: { $exists: true, $nin: [null, ''] } };
+    if (req.query && req.query.client)
+        matchQuery.client = req.query.client;
+
     User.aggregate([
-        { $match: { country: { $exists: true, $ne: null, $ne: '' } } },
+        { $match: matchQuery },
         {
             $group: {
                 _id: '$country'

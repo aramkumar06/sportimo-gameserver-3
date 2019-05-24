@@ -2,8 +2,8 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    player = mongoose.models.players,
-    team = mongoose.models.teams,
+    player = mongoose.models.trn_players,
+    team = mongoose.models.trn_teams,
     _ = require('lodash'),
     async = require('async'),
     moment = require('moment'),
@@ -160,11 +160,13 @@ api.matchtags = function (req, res) {
         match.home_team.players.forEach(function (player) {
             player = player.toObject();
             player.type = "Player";
+            player.teamId = match.home_team._id;
             matchTags.push(player);
         });
         match.away_team.players.forEach(function (player) {
             player = player.toObject();
             player.type = "Player";
+            player.teamId = match.away_team._id;
             matchTags.push(player);
         });
 

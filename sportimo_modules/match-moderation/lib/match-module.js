@@ -1401,17 +1401,13 @@ var matchModule = function (match, shouldInitAutoFeed) {
 
                             log.info(`[Match module ${HookedMatch.name}]: Now that the end gamecards have been resolved, reward players for achievements`);
 
-                            if (HookedMatch.data.settings.sendPushes === undefined || HookedMatch.data.settings.sendPushes) {
-                                return async.parallel([
-                                // Handle all achievements calculated at the end of a match
-                                    // 1. Persistant Gamer
-                                    (innerCbk) => { return Achievements.Reward.persist_gamer(HookedMatch.id, innerCbk); },
-                                    // 2. Rank achievements
-                                    (innerCbk) => { return Achievements.Reward.rank_achievements(HookedMatch.id, innerCbk); }
-                                ], cbk);
-                            }
-                            else
-                                return async.setImmediate(() => { cbk(null); });
+                            return async.parallel([
+                            // Handle all achievements calculated at the end of a match
+                                // 1. Persistant Gamer
+                                (innerCbk) => { return Achievements.Reward.persist_gamer(HookedMatch.id, innerCbk); },
+                                // 2. Rank achievements
+                                (innerCbk) => { return Achievements.Reward.rank_achievements(HookedMatch.id, innerCbk); }
+                            ], cbk);
                         });
                     }
                 ], () => {

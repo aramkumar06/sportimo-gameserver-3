@@ -2,7 +2,7 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    Poll = mongoose.models.trn_leaderboard_defs,
+    Poll = mongoose.models.trn_polls,
     Users = mongoose.models.users,
     _ = require('lodash'),
     logger = require('winston'),
@@ -53,7 +53,13 @@ api.getPollsByMatch = function (req, res) {
 api.addpoll = function (req, res) {
 
     if (req.body == 'undefined') {
-        return res.status(500).json('No valid Poll Provided. Please provide valid data.');
+        return res.status(400).json('No valid Poll Provided. Please provide valid data.');
+    }
+    if (!req.body.client) {
+        return res.status(400).json('No valid client Provided. Please provide valid client id.');
+    }
+    if (!req.body.tournament) {
+        return res.status(400).json('No valid tournament Provided. Please provide valid tournament id.');
     }
 
     var newItem = new Poll(req.body);
