@@ -9,7 +9,7 @@ var mongoCreds = require('../../config/mongoConfig');
 
 try {
 
-    const competitionId = "56f4800fe4b02f2226646297";	// Premier League
+    //const competitionId = "56f4800fe4b02f2226646297";	// Premier League
     //var competitionId = "577ec1011916317238fd2f33";	// Germany Bundesliga
     //var competitionId = "577ec1381916317238fd2f34";	// Italy serie A
     //var competitionId = "577ec1a61916317238fd2f36";	// Spain Liga Primera
@@ -17,7 +17,7 @@ try {
     //var competitionId = "588a71ec971f4ca44b4f67e0";	// UAE Arabian Gulf League
     //var competitionId = "588a7345971f4ca44b4f67e1";	// Egypt Premier League
     //var competitionId = "577ec2f71916317238fd2f39";	// Champions League
-    //var competitionId = "577ec33d1916317238fd2f3a";	// Europa League -- needs Statscore update for 2018-2019
+    var competitionId = "577ec33d1916317238fd2f3a";	// Europa League -- needs Statscore update for 2018-2019
     //var competitionId = "5aaf6a958b3e30b41dab995f";	// France League 1
     //var competitionId = "577ec22b1916317238fd2f37";	// World Cup 2018
     //var competitionId = "5b4c63370807967e35f780e1";	// Africa CAF Champions League
@@ -62,8 +62,8 @@ try {
                 //statscore.GetPastEventFeed(2436921, (err, result) => {
                 //statscore.UpdateTeamPlayersCareerStats("588a8d890bb50f00feda8dbe", 29362, (err, playersUpdated) => {
                 //statscore.TestGuruStats((err) => {
-                statscore.MigrateArabicNamesAndKits(competitionId, seasonId, (err, result) => {
-                //statscore.UpdateTeams(competitionId, seasonId, (err, result) => {
+                //statscore.MigrateArabicNamesAndKits(competitionId, seasonId, (err, result) => {
+                statscore.UpdateTeams(competitionId, seasonId, (err, result) => {
                 //statscore.UpdateAllCompetitionStats(competitionId, 2018, (err, result) => {
                 //stats.UpdateAllCompetitionStats(competitionId, 2017, (err, result) => {
                 //statscore.UpdateLeagueStandings(null, competitionId, "56f4800fe4b02f2226646297", (err, result) => {
