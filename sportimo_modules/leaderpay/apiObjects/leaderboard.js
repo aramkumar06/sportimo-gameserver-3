@@ -125,24 +125,21 @@ api.getSocialLeaderboardWithRank = function (id, body, mid, cb) {
 
         // console.log(leader_conditions);
 
-        var q = Score.aggregate({
-            $match: leader_conditions
-        });
+        var q = Score.aggregate([
+            {
+                $match: leader_conditions
+            },
+            {
+                _id: "$user_id",
+                score: { $sum: "$score" },
+                name: { $first: '$user_name' },
+                level: { $max: '$level' },
+                pic: { $last: '$pic' },
+                country: { $first: '$country' }
+            },
+            { $sort: { score: -1 } }
+        ]);
 
-
-
-        q.group({
-            _id: "$user_id",
-            score: { $sum: "$score" },
-            name: { $first: '$user_name' },
-            level: { $max: '$level' },
-            pic: { $last: '$pic' },
-            country: { $first: '$country' }
-        });
-
-
-
-        q.sort({ score: -1 });
 
         var rank;
         var user;
