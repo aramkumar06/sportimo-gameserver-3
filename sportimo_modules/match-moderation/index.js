@@ -145,13 +145,13 @@ var ModerationModule = {
         }, 30000);
 
         RedisClientPub.on("error", function (err) {
-            console.log("{''Error'': ''" + err + "''}");
+            console.log("{'Error': '" + err + "'}");
 
             console.error(err.stack);
         });
 
         RedisClientSub.on("error", function (err) {
-            log.error("{''Error'': ''" + err + "''}");
+            log.error("{'Error': '" + err + "'}");
         });
 
         var countConnections = 0;

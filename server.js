@@ -220,6 +220,10 @@ try {
         else {
             console.log("[Game Server] MongoDB Connected.");
 
+            mongoose.connection.on('disconnected', function () {
+                console.log("Mongoose default connection is closed");
+            });
+
             /* Modules */
 
             app.use('/offline_data/', require('./sportimo_modules/offline_data/api/ondemand.js'));

@@ -94,6 +94,7 @@ api.additem = function (req, res) {
 
     var mergedData = _.merge(_.cloneDeep(defaultMatch), req.body);
     var newItem = new item(mergedData);
+    newItem.markModified('settings');
 
     return newItem.save(function (err, data) {
         if (err) {
