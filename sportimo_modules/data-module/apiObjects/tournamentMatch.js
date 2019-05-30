@@ -7,6 +7,7 @@ var mongoose = require('mongoose'),
     async = require('async'),
     Entity = mongoose.models.trn_matches,
     Match = mongoose.models.matches,
+    EmptyMatch = require('../config/empty-match'),
     api = {};
 
 
@@ -110,9 +111,11 @@ api.add = function (entity, cb) {
     async.waterfall([
         (cbk) => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }, cbk),
         (templates, cbk) => {
-            // Try finding the referrenced match, if existing already in the matches collection
+            // Try finding the referrenced match, if existing already in the matches collection, that is not completed
 
-            const matchQuery = {};
+            const matchQuery = {
+                completed: { $ne: true }
+            };
             if (templates && templates.length > 0)
                 leaderboardTemplate = templates[0];
 
@@ -141,7 +144,15 @@ api.add = function (entity, cb) {
                 return cbk(null, entity.match, 0);
             }
             else {
-                const newMatch = new Match(entity);
+
+                const mergedData = _.merge(_.cloneDeep(defaultMatch), entity);
+                const newMatch = new Match(mergedData);
+                newMatch.timeline = [{
+                    timed: false,
+                    text: { en: "Pre Game", ar: "ماقبل المباراة" }
+                }];
+                newMatch.markModified('settings');
+
                 return newMatch.save(cbk);
             }
         },

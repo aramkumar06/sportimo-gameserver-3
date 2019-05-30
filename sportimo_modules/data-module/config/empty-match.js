@@ -17,19 +17,19 @@ module.exports = {
             "specials": 4,
             "totalcards": 15
         },
-        "matchRules": {
-            "freeUserPlaySegments": [
-                0,
-                1,
-                2
-            ],
-            "freeUserHasPlayTimeWindow": false,
-            "freeUserPregameTimeWindow": 20,
-            "freeUserLiveTimeWindow": 20,
-            "freeUserAdsToGetCards": false,
-            "freeUserCardsCap": false,
-            "freeUserCardsLimit": 5
-        },
+        //"matchRules": {
+        //    "freeUserPlaySegments": [
+        //        0,
+        //        1,
+        //        2
+        //    ],
+        //    "freeUserHasPlayTimeWindow": false,
+        //    "freeUserPregameTimeWindow": 20,
+        //    "freeUserLiveTimeWindow": 20,
+        //    "freeUserAdsToGetCards": false,
+        //    "freeUserCardsCap": false,
+        //    "freeUserCardsLimit": 5
+        //},
         "hashtag": "#sportimo",
         "destroyOnDelete": true,
         "sendPushes": true
