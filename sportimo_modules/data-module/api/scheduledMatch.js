@@ -65,8 +65,18 @@ const findReplayableMatches = function (competitionId, callback) {
                     const newHomeTeam = teamParserIdMap[m.home_team.parserids.Statscore];
                     const newAwayTeam = teamParserIdMap[m.away_team.parserids.Statscore];
 
+                    // Replace with updated team objects
                     match.home_team = newHomeTeam;
                     match.away_team = newAwayTeam;
+                    // Initialize match properties
+                    match.timeline = [];
+                    match.stats = [];
+                    match.home_score = 0;
+                    match.away_score = 0;
+                    match.state = 0;
+                    match.time = 1;
+                    match.disabled = false;
+                    match.completed = false;
 
                     return match;
                 });
