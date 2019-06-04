@@ -764,9 +764,12 @@ class PushNotifications {
                 });
             },
             // Disable match if not disabled already
-            (cb) => {
-                return tournamentMatches.findOneAndUpdate({ _id: trnMatch._id }, { isHidden: true }).exec(cb);
-            }
+
+            // ToDo: Resume again before deploying in PRODUCTION !!!!!!
+
+            //(cb) => {
+            //    return tournamentMatches.findOneAndUpdate({ _id: trnMatch._id }, { isHidden: true }).exec(cb);
+            //}
         ], () => {
             return callback(error);
         });
