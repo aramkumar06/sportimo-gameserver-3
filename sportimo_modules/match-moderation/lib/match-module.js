@@ -755,7 +755,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 }
 
                 if (callback)
-                    callback();
+                    callback(null, HookedMatch);
 
                 return HookedMatch;
             });
