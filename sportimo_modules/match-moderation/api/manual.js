@@ -147,7 +147,9 @@ module.exports = function (ModerationModule) {
             case "AdvanceSegment":
                 //console.log(req.body);
                 log.info("Advance Segment Request for matchid [" + match_id + "]");
-                res.status(200).send(match.AdvanceSegment(req.body));
+                match.AdvanceSegment(req.body, (err, result) => {
+                    res.status(200).send(result);
+                });
                 break;
             case "Terminate":
                 //console.log(req.body);
@@ -156,7 +158,7 @@ module.exports = function (ModerationModule) {
                 break;
             case "SocketMessage":
                 //console.log(req.body);
-                log.info("Socket Message send for matchid [" + match_id + "]");
+                log.info("Socket Message sent for matchid [" + match_id + "]");
                 res.status(200).send(match.SocketMessage(req.body.data));
                 break;
             default:
