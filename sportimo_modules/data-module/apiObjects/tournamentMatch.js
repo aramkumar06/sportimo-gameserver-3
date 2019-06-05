@@ -4,6 +4,7 @@
 var mongoose = require('mongoose'),
     moment = require('moment'),
     ObjectId = mongoose.Schema.Types.ObjectId,
+    _ = require('lodash'),
     async = require('async'),
     Entity = mongoose.models.trn_matches,
     Match = mongoose.models.matches,
@@ -27,6 +28,10 @@ api.getAll = function (tournamentId, skip, limit, cb) {
         q.limit(limit * 1);
 
     return q.exec(function (err, entities) {
+
+        if (!err && entities)
+            entities = _.orderBy(entities, [ e => e.match.start ], ['desc'] );
+
         cbf(cb, err, entities);
     });
 };
@@ -141,11 +146,10 @@ api.add = function (entity, cb) {
             if (matches && matches.length > 0) {
                 entity.match = matches[0];
 
-                return cbk(null, entity.match, 0);
+                return cbk(null, entity.match);
             }
             else {
-
-                const mergedData = _.merge(_.cloneDeep(defaultMatch), entity);
+                const mergedData = _.merge(_.cloneDeep(EmptyMatch), entity);
                 const newMatch = new Match(mergedData);
                 newMatch.timeline = [{
                     timed: false,
@@ -156,7 +160,7 @@ api.add = function (entity, cb) {
                 return newMatch.save(cbk);
             }
         },
-        (savedMatch, savedQuantity, cbk) => {
+        (savedMatch, cbk) => {
 
            if (!entity.match)
                 entity.match = savedMatch;
@@ -194,11 +198,11 @@ api.add = function (entity, cb) {
         if (waterfallErr)
             return cb(waterfallErr);
 
-        const savedMatch = parallelResults[0][0];
+        const savedTournamentMatch = parallelResults[0];
 
         const MatchModeration = require('../../match-moderation');
-        MatchModeration.LoadMatchFromDB(savedMatch.id, function (err) {
-            return savedMatch.populate('match', cb);
+        MatchModeration.LoadMatchFromDB(savedTournamentMatch.id, function (err) {
+            return savedTournamentMatch.populate('match', cb);
         });
     });
 
