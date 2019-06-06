@@ -708,7 +708,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
                     sockets: true,
                     payload: {
                         type: "Stats_changed",
-                        room: thisMatch._id,
+                        room: thisMatch.id,
                         data: thisMatch.stats
                     }
                 });
