@@ -114,7 +114,7 @@ api.add = function (entity, cb) {
     let leaderboardTemplate = null;
 
     async.waterfall([
-        (cbk) => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }, cbk),
+        (cbk) => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }).limit(1).exec(cbk),
         (templates, cbk) => {
             // Try finding the referrenced match, if existing already in the matches collection, that is not completed
 
@@ -140,7 +140,7 @@ api.add = function (entity, cb) {
             else
                 return cbk(null, []);
 
-            return Match.find(matchQuery, '_id moderation name', cbk);
+            return Match.find(matchQuery, '_id moderation name').limit(1).exec(cbk);
         },
         (matches, cbk) => {
             if (matches && matches.length > 0) {
@@ -151,6 +151,7 @@ api.add = function (entity, cb) {
             else {
                 const mergedData = _.merge(_.cloneDeep(EmptyMatch), entity);
                 const newMatch = new Match(mergedData);
+                newMatch.exclusiveClient = entity.client;
                 newMatch.timeline = [{
                     timed: false,
                     text: { en: "Pre Game", ar: "ماقبل المباراة" }
