@@ -29,20 +29,13 @@ var achievement = new Schema({
     completed: Boolean
 });
 
-// var rankingStat = new Schema({
-//     bestRank: Number,
-//     bestRankMatch: {
-//         ref: 'scheduled_matches',
-//         type: String
-//     },
-//     bestScore: Number,
-//     bestScoreMatch: {
-//         ref: 'scheduled_matches',
-//         type: String
-//     }
-// })
-
 var Achievements = mongoose.model('achievements', achievement);
+
+var favTeamSchema = new Schema({
+    competition: { type: Schema.Types.ObjectId, ref: 'trn_competitions' },
+    team: { type: Schema.Types.ObjectId, ref: 'trn_teams' }
+});
+
 
 var UserSchema = new Schema(
     {
@@ -128,7 +121,10 @@ var UserSchema = new Schema(
         level: { type: Number, default: 0 },
         achievements: [achievement],
         blockedusers: [String],
+        // This is obsolete now
         favoriteteams: [String],
+        // and replaced by this one in Sportimo 3.0
+        favTeams: [favTeamSchema],
         unlockedmatches: [String],
         isOnline: { type: Boolean, default: false },
         deletedAt: { type: Date },
