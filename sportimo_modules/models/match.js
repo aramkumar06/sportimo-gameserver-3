@@ -55,8 +55,14 @@ else {
         interval: Number
     });
 
+
+
+
     var matchSchema = new mongoose.Schema({
-        sport: { type: String, default: 'soccer' },
+        sport: {
+            type: String,
+            default: 'soccer'
+        },
         home_team: {
             type: ObjectId,
             ref: 'trn_teams'
@@ -67,33 +73,75 @@ else {
         },
         start: Date,
         color: String,
-        competition: { type: ObjectId, ref: 'trn_competitions' },
-        season: { type: ObjectId, ref: 'trn_competition_seasons' },
+        competition: {
+            type: ObjectId,
+            ref: 'trn_competitions'
+        },
+        season: {
+            type: ObjectId,
+            ref: 'trn_competition_seasons'
+        },
         name: String,   // a match name generated from team names, mainly for tracing and debugging reasons
-        disabled: { type: Boolean, default: true },
+        exclusiveClient: {      // when the match is setup exclusively for a specific client, not to be shared with others
+            type: ObjectId,
+            ref: 'trn_clients'
+        },
+        disabled: {
+            type: Boolean,
+            default: true
+        },
         donttouch: Boolean,
         visiblein: [String],
-        isTimeCounting: { type: Boolean, default: false },
-        home_score: { type: Number, default: 0 },
-        away_score: { type: Number, default: 0 },
+        isTimeCounting: {
+            type: Boolean,
+            default: false
+        },
+        home_score: {
+            type: Number,
+            default: 0
+        },
+        away_score: {
+            type: Number,
+            default: 0
+        },
         match_date: Date,
-        time: { type: Number, default: 0 },
-        state: { type: Number, default: 0 },
-        completed: { type: Boolean, default: false },
+        time: {
+            type: Number,
+            default: 0
+        },
+        state: {
+            type: Number,
+            default: 0
+        },
+        completed: {
+            type: Boolean,
+            default: false
+        },
         stats: [mongoose.Schema.Types.Mixed],
         guruStats: mongoose.Schema.Types.Mixed,
-        headtohead: { type: Array, default: ["W", "W", "D", "L", "L"] },
+        headtohead: {
+            type: Array,
+            default: ["W", "W", "D", "L", "L"]
+        },
         timeline: [segment],
         settings: mongoose.Schema.Types.Mixed,
         moderation: [moderationService],
-        guruStatsChecked: { type: Boolean, default: false },
+        guruStatsChecked: {
+            type: Boolean,
+            default: false
+        },
         updatedAt: Date,
         createdAt: Date,
-        server_time: { type: Date }
+        server_time: {
+            type: Date
+        }
     }, {
             collection: 'matches',
             minimize: false,
-            timestamps: { updatedAt: 'updatedAt', createdAt: 'createdAt' }
+            timestamps: {
+                updatedAt: 'updatedAt',
+                createdAt: 'createdAt'
+            }
         });
 
     module.exports = mongoose.model("matches", matchSchema);
