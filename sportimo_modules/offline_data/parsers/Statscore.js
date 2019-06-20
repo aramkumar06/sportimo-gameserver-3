@@ -354,7 +354,7 @@ Parser.UpdateTeamStatsFull = function (parserSeasonId, teamId, season, outterCal
                     // last 5 matches form
                     const recentFormColumn = _.find(teamStats.columns, { id: 46 });
                     if (recentFormColumn && recentFormColumn.value) {
-                        team.recentForm = TranslateRecentForm(recentFormColumn.value);
+                        team.recentform = TranslateRecentForm(recentFormColumn.value);
                     }
                     // team standing stats
                     team.standing = TranslateTeamStanding(teamStats, team);
@@ -855,7 +855,7 @@ Parser.UpdateTeams = function (competitionId, seasonId, callback) {
                 if (teamStats && teamStats.columns) {
                     const recentFormColumn = _.find(teamStats.columns, { id: 46 });
                     if (recentFormColumn)
-                        mongoTeamStatsInstance.recentForm = TranslateRecentForm(recentFormColumn.value);
+                        mongoTeamStatsInstance.recentform = TranslateRecentForm(recentFormColumn.value);
                 }
 
                 // Fill in with last and next match and stats so far for each team to be either updated or inserted
@@ -935,7 +935,7 @@ Parser.UpdateTeams = function (competitionId, seasonId, callback) {
                 if (teamStats && teamStats.columns) {
                     const recentFormColumn = _.find(teamStats.columns, { id: 46 });
                     if (recentFormColumn)
-                        mongoTeamStatsInstance.recentForm = TranslateRecentForm(recentFormColumn.value);
+                        mongoTeamStatsInstance.recentform = TranslateRecentForm(recentFormColumn.value);
                 }
 
                 // Fill in with last and next match and stats so far for each team to be either updated or inserted
@@ -2044,7 +2044,7 @@ Parser.UpdateAllCompetitionStats = function (competitionId, season, outerCallbac
     async.waterfall(
         [
             function (callback) {
-                Parser.GetLeagueFromMongo(competitionId, null, false, function (error, comp) {
+                GetLeagueFromMongo(competitionId, null, false, function (error, comp) {
                     if (error)
                         return callback(error);
                     competitionSeason = comp;
@@ -2053,14 +2053,14 @@ Parser.UpdateAllCompetitionStats = function (competitionId, season, outerCallbac
             },
             function (callback) {
                 log.info('Now on to updating teams and players for competition %s', competitionSeason.competition.name.en);
-                Parser.UpdateTeams(competitionId, function (error, teamsAdded, playersAdded, teamsUpdated, playersUpdated) {
+                Parser.UpdateTeams(competitionId, null, function (error, teamsAdded, playersAdded, teamsUpdated, playersUpdated) {
                     if (error)
                         return callback(error);
                     callback(null);
                 });
             },
             function (callback) {
-                Parser.GetTeamStatsFromMongo(competitionId, competitionSeason.id, competitionSeason.teams, function (error, teamsStats) {
+                GetTeamStatsFromMongo(competitionId, competitionSeason.id, competitionSeason.teams, function (error, teamsStats) {
                     if (error)
                         return callback(error);
 

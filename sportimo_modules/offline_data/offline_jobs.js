@@ -32,6 +32,7 @@ try {
     //var competitionId = "5b5a36b38b3e30b41dacb3e0";	// UEFA Super Cup
     //var competitionId = "5b8f80468b3e30b41dacd016";	// UEFA Nations League
     //var competitionId = "5bbd9d4ac7cc110d8f3979e8";	// International Friendlies
+    //const competitionId = "5cfe25954e8dece82fc3636c";	// Copa America 2019
 
 
     let seasonId = null; // default season, get the latest one for the given competition id
