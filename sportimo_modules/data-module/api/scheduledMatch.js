@@ -90,7 +90,7 @@ const findReplayableMatches = function (competitionId, callback) {
 
 router.get('/v1/data/schedule-replay', (req, res) => {
 
-    findReplayableMatches(null, null, (err, matches) => {
+    findReplayableMatches(null, (err, matches) => {
         if (err) {
             logger.error(err.stack);
             return res.status(500).json({ error: err.message });

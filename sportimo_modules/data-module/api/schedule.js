@@ -30,6 +30,26 @@ api.items = function (req, res) {
     });
 };
 
+api.future_items = function (req, res) {
+
+    var skip = null, limit = null;
+    var now = new Date();
+
+    item
+        .find({ start: {$gt: now}, completed: {$ne: true} })
+        .populate({
+            path: 'match',
+            match: {  },
+            select: 'home_team home_score away_team away_score competition time state start completed',
+            populate: [{ path: 'home_team', select: 'name logo' }, { path: 'away_team', select: 'name logo' }, { path: 'competition' }]
+        })
+        .sort({ 'match.start': -1 })
+        .limit(50)
+    .exec( (err, items) => {
+
+        return res.send(items);
+    });
+};
 
 // ALL
 api.itemsSearch = function (req, res) {
@@ -226,7 +246,11 @@ api.deleteitem = function (req, res) {
 router.route('/v1/data/schedule/country/:country')
     .get(api.items);
 
-router.route('/v1/data/schedule/')
+// Request the schedule based on user's country
+router.route('/v1/data/schedule/future')
+    .get(api.future_items);
+
+router.route('/v1/data/schedule/') 
     .get(api.itemsSearch);
 
 router.post('/v1/data/schedule', api.additem);
