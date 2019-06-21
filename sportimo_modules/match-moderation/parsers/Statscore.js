@@ -398,7 +398,7 @@ function Parser(matchContext, feedServiceContext) {
 
     // determines whether the match is simulated from previously recorded events in all_events kept in matchfeedstatuses
     this.simulationStep = 0;
-    this.isSimulated = false;
+    this.isSimulated = feedServiceContext.simulatedfeed || false;
     
     // the parser upon initialization will inquire about all team players and their parserids.
     this.matchPlayersLookup = {};
@@ -460,6 +460,9 @@ Parser.prototype.init = function (cbk) {
     // Execute multiple async functions in parallel getting the player ids and parserids mapping
     async.parallel([
         function (callback) {
+            if (that.simulated)
+                return callback(null);
+
             BookMatch(that.matchParserId, (bookErr, bookResult) => {
                 if (!bookErr)
                     isBooked = true;
@@ -475,14 +478,7 @@ Parser.prototype.init = function (cbk) {
                 if (parsed_eventids && parsed_eventids.length > 0) {
                     that.sportimoEventIdsQueue = parsed_eventids;
                 }
-                else {
-                    //that.feedService.LoadMatchEvents(that.Name, that.matchHandler.id, function (error, matchParserEventIds) {
-                    //    if (error)
-                    //        return callback(error);
 
-                    //    that.sportimoEventIdsQueue = matchParserEventIds;
-                    //});
-                }
                 if (parser_status)
                     that.status = parser_status;
 
@@ -551,10 +547,20 @@ Parser.prototype.init = function (cbk) {
             log.info(`[Statscore on ${that.matchHandler.name}]: Queue listener started immediately for matchid ${that.matchHandler.id}`);
             return async.parallel([
                 (asyncCbk) => {
-                    // TODO: Replace back with commented out line below:
-                    // StartQueueReceiver(that.matchParserId);
-                    that.StartQueueReplayer(that.matchParserId);
-                    return BookMatch(that.matchParserId, asyncCbk);
+                    if (that.isSimulated) {
+                        that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
+                        return asyncCbk(null);
+                    }
+
+                    // !! Uncomment before PRODUCTION !!
+
+                    //else {
+                    //    StartQueueReceiver(that.matchParserId);
+                    //    return BookMatch(that.matchParserId, asyncCbk);
+                    //}
+
+                    else
+                        return asyncCbk(null);
                 }
             ], cbk);
         }
@@ -564,10 +570,14 @@ Parser.prototype.init = function (cbk) {
 
                 that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
                     log.info(`[Statscore on ${that.matchHandler.name}]: Scheduled queue listener started for matchid ${that.matchHandler.id}`);
-                    // TODO: Replace back with commented out line below:
-                    // StartQueueReceiver(that.matchParserId);
-                    that.StartQueueReplayer(that.matchParserId);
-                    //MessagingTools.sendPushToAdmins({ en: 'Statscore scheduled feed listener started for matchid: ' + that.matchHandler.id });
+                    if (that.isSimulated)
+                        that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
+
+                    // !! Uncomment before PRODUCTION !!
+
+                    //else
+                    //    StartQueueReceiver(that.matchParserId);
+                                //MessagingTools.sendPushToAdmins({ en: 'Statscore scheduled feed listener started for matchid: ' + that.matchHandler.id });
                 });
 
                 if (that.scheduledTask) {
@@ -582,17 +592,30 @@ Parser.prototype.init = function (cbk) {
 
                 } else
                     if (!that.matchHandler.completed || that.matchHandler.completed == false) {
-                        //        log.info('[Statscore parser]: Fetching only once feed events for matchid %s', that.matchHandler.id);
-                        //        that.TickMatchFeed();
-                        that.isSimulated = true;
                         log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
                         that.StartQueueReplayer(that.matchParserId, that.sportimoEventIdsQueue);
+                        that.isSimulated = true;
                     }
 
                 return cbk(null);
             }
-            else
-                return cbk(new Error(`[Statscore parser]: Failed to book match id ${that.matchHandler.id} (parser id ${that.matchParserId})`));
+            else {
+                if (that.isSimulated) {
+
+                    that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
+                        log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
+                        that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
+                    });
+                    if (!that.scheduledTask) {
+                        log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
+                        that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
+                    }
+
+                    return cbk(null);
+                }
+                else
+                    return cbk(new Error(`[Statscore parser]: Failed to book match id ${that.matchHandler.id} (parser id ${that.matchParserId})`));
+            }
         }
     });
 };
@@ -618,10 +641,6 @@ Parser.prototype.StartQueueReplayer = function (matchParserId, matchParserEventI
 
         allEvents = _.filter(allEvents, (e) => { return !matchParserEventIdLookup[TranslateEventMessageId(e)]; });
 
-        //_.forEach(allEvents, (event) => {
-        //    Emitter.emit('event', event);
-        //});
-
         async.eachSeries(allEvents, (event, cbk) => {
             if (this.feedService)
                 setTimeout(() => {
@@ -635,11 +654,11 @@ Parser.prototype.StartQueueReplayer = function (matchParserId, matchParserEventI
 };
 
 
-Parser.prototype.GetMatchFeedStatusFeed = function (matchId, callback) {
+Parser.prototype.GetMatchFeedStatusFeed = function (simulatedFeedId, callback) {
 
     const that = this;
 
-    matchFeedStatuses.findOne({ matchid: matchId }, { ['diffed_events.' + that.Name]: 1 }, (err, matchFeedStatus) => {
+    matchFeedStatuses.findById(simulatedFeedId, { ['diffed_events.' + that.Name]: 1 }, (err, matchFeedStatus) => {
         if (err)
             return callback(err);
 
@@ -660,7 +679,7 @@ Parser.prototype.StartMatchFeedReplayer = function (matchParserId, matchParserEv
     that.GetMatchFeedStatusFeed(matchParserId, (err, allEvents) => {
         if (err) {
             log.error(err.message);
-            return callback(error);
+            return callback ? callback(error) : error;
         }
 
         // order events chronologically by its utc epoch (ut property)
@@ -679,7 +698,7 @@ Parser.prototype.StartMatchFeedReplayer = function (matchParserId, matchParserEv
                 cbk(null);
         });
 
-        return callback(null);
+        return callback ? callback(null) : null;
     });
 };
 

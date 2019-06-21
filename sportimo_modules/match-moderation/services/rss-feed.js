@@ -87,6 +87,7 @@ function feedService(service) {
     this.interval = service.interval || 5000;
 
     this.active = service.active === 'undefined' || service.active == null ? true : service.active;
+    this.simulatedfeed = service.simulatedfeed || null;
 
     // Should we log all events received from feed or just the last one
     this.logAllEvents = service.logAllEvents === 'undefined' || service.logAllEvents == null ? process.env.NODE_ENV == "development" ? true : false : service.logAllEvents;

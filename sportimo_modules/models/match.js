@@ -49,6 +49,7 @@ else {
         type: String,
         parserid: String,
         parsername: String,
+        simulatedfeed: { type: String, default: null },
         start: String,
         active: Boolean,
         scheduled: Boolean,

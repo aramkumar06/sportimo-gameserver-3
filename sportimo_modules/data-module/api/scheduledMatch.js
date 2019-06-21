@@ -7,6 +7,7 @@
     teams = require('../../models/team'),
     trnTeams = mongoose.models.trn_teams,
     trnMatches = mongoose.models.trn_matches,
+    trnCompetitionSeasons = mongoose.models.trn_competition_seasons,
     matches = mongoose.models.matches,
     defaultMatch = require('../config/empty-match'),
     logger = require('winston'),
@@ -18,20 +19,38 @@
 
 const findReplayableMatches = function (competitionId, callback) {
 
+
+    let matchCandidates = [];
+    let competitionSeasons = [];
+
     async.waterfall([
-        cbk => matchfeedStatuses.find({ 'diffed_events.Statscore': { $ne: null } }, { matchid: true }, cbk),
-        (feeds, cbk) => {
-            const matchObjectIds = _.map(feeds, i => new ObjectId(i.matchid));
-            const query = { _id: { $in: matchObjectIds }, completed: true };
+        (cbk) => {
+
+            const query = { completed: true };
             if (competitionId)
                 query.competition = competitionId;
-            return scheduledMatches.find(query, { timeline: 0, _id: 0 })
-                .populate('home_team away_team')
-                .exec(cbk);
+            async.parallel([
+                icbk => scheduledMatches.find(query, { timeline: 0, stats: 0 })
+                    .populate('home_team away_team')
+                    .exec(icbk),
+                icbk => trnCompetitionSeasons.find({ status: 'active' }, '-teams').populate('competition', 'name logo').exec(icbk)
+            ], cbk);
         },
-        (matchCandidates, cbk) => {
+        (parallelResults, cbk) => {
+
+            matchCandidates = parallelResults[0];
+            competitionSeasons = parallelResults[1];
+            const matchIds = _.map(parallelResults[0], i => i.id);
+            const query = { 'diffed_events.Statscore': { $ne: null } };
+            if (matchIds.length > 0)
+                query.matchid = { $in: matchIds };
+            matchfeedStatuses.find(query, { matchid: 1 }, cbk);
+        },
+        (matchedFeeds, cbk) => {
+
             // Find teams by their Statscore id
             const teamParserIds = [];
+            matchCandidates = matchCandidates.filter(elem => !!matchedFeeds.find(f => f.matchid === elem.id));
             matchCandidates.forEach(m => {
                 if (m.home_team && m.home_team.parserids && m.home_team.parserids['Statscore'])
                     teamParserIds.push(m.home_team.parserids['Statscore']);
@@ -44,10 +63,16 @@ const findReplayableMatches = function (competitionId, callback) {
 
                 const teamParserIdMap = _.keyBy(teams, t => t.parserids.Statscore);
 
+                const competitions = _.uniq(_.map(competitionSeasons, s => s.competition));
                 const filteredMatches = _.filter(matchCandidates, m => {
                     if (!m.home_team || !m.home_team.parserids || !m.home_team.parserids.Statscore)
                         return false;
                     if (!m.away_team || !m.away_team.parserids || !m.away_team.parserids.Statscore)
+                        return false;
+                    if (!m.competition)
+                        return false;
+                    const foundCompetition = _.find(competitions, c => c.id === m.competition);
+                    if (!foundCompetition)
                         return false;
 
                     const newHomeTeam = teamParserIdMap[m.home_team.parserids.Statscore];
@@ -78,7 +103,20 @@ const findReplayableMatches = function (competitionId, callback) {
                     match.disabled = false;
                     match.completed = false;
 
-                    return match;
+                    let matchDto = match.toObject();
+                    delete matchDto._id;
+
+                    const matchedFeed = matchedFeeds.find(f => f.matchid === m.id);
+                    if (matchDto.moderation && matchDto.moderation.length > 0) {
+                        matchDto.moderation.forEach(m => m.simulatedfeed = matchedFeed.id);
+                    }
+
+                    const foundCompetition = _.find(competitions, c => c.id === m.competition);
+                    if (foundCompetition)
+                        matchDto.competition = foundCompetition;
+                    matchDto.season = _.omit(_.find(competitionSeasons, s => s.competition.id === m.competition), ['competition']);
+
+                    return matchDto;
                 });
 
                 return cbk(null, mappedMatches);

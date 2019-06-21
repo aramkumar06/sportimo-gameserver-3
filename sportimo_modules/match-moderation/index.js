@@ -257,7 +257,7 @@ var ModerationModule = {
         .findOne({
             _id: tmatchid
         })
-        .populate({ path: 'match', populate: [{ path: 'home_team', select: 'name abbr logo color' }, { path: 'away_team', select: 'name abbr logo color' }, { path: 'season' }] })
+        .populate({ path: 'match', populate: [{ path: 'home_team', select: 'name abbr logo color parserids' }, { path: 'away_team', select: 'name abbr logo color parserids' }, { path: 'season' }] })
         .exec(function (err, tournamentMatch) {
             if (err)
                 return cbk ? cbk(err) : err;
@@ -532,8 +532,15 @@ ModerationModule.updateMatchcronJobsInfo = function () {
                 .exec(cbk);
         }
     ], function (err, trnMatches) {
-        async.each(trnMatches, function (trnMatch, cbk) {
+
+        let matchIdsUpdated = [];
+        async.eachSeries(trnMatches, function (trnMatch, cbk) {
             const match = trnMatch.match;
+
+            // No need to update the same match twice
+            if (_.indexOf(matchIdsUpdated, match.id) > -1)
+                return cbk(null);
+
             const jobs = _.filter(scheduler.scheduledJobs, { name: match.id });
             const matchInMemory = ModerationModule.GetTournamentMatch(trnMatch.id);
 
@@ -561,6 +568,11 @@ ModerationModule.updateMatchcronJobsInfo = function () {
                 }
             });
             match.save(function (er, re) {
+                if (er)
+                    return cbk(null);
+
+                matchIdsUpdated.push(re.id);
+
                 if (matchInMemory) {
                     matchInMemory.data.moderation[0].start = re.moderation[0].start;
                     matchInMemory.data.moderation[0].scheduled = re.moderation[0].scheduled;

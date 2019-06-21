@@ -111,6 +111,9 @@ api.add = function (entity, cb) {
     if (!entity.disabled)
         entity.disabled = false;
 
+    //const clientExclusiveMatch = !entity.moderation || entity.moderation.length === 0;
+    const simulationMatch = entity.moderation && _.some(entity.moderation, m => m.simulatedfeed);
+
     let leaderboardTemplate = null;
 
     async.waterfall([
@@ -124,7 +127,7 @@ api.add = function (entity, cb) {
             if (templates && templates.length > 0)
                 leaderboardTemplate = templates[0];
 
-            if (entity.moderation && entity.moderation.length > 0) {
+            if (!simulationMatch && entity.moderation && entity.moderation.length > 0) {
                 matchQuery.$or = [];
                 entity.moderation.forEach((m) => {
                     matchQuery.$or.push({
@@ -279,22 +282,24 @@ api.edit = function (tournamentId, id, updateData, cb) {
 api.delete = function (tournamentId, id, cb) {
 
     let matchId = null;
+    let clientId = null;
 
     async.waterfall([
-        (cbk) => { return Entity.findOneAndRemove({ _id: id, tournament: tournamentId }).exec(cbk); },
+        cbk => Entity.findOneAndRemove({ _id: id, tournament: tournamentId }).exec(cbk),
         (trnMatch, cbk) => {
             if (!trnMatch)
                 return cbk(null);
 
             matchId = trnMatch.match.toHexString();
+            clientId = trnMatch.client;
             return Entity.find({ match: matchId }, cbk);
         },
-        // Try removing the referenced match if no other trn_matches document reffers to it
+        // Try removing the referenced match if it is exclusive to this client
         (otherTrnMatches, cbk) => {
             if (otherTrnMatches && otherTrnMatches.length > 0)
                 return cbk(null);
 
-            Match.remove({ _id: matchId }, cbk);
+            Match.remove({ _id: matchId, exclusiveClient: clientId }, cbk);
         }
     ], (err, results) => {
 
