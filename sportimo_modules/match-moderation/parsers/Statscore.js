@@ -89,6 +89,22 @@ var statscoreConfigProduction = {
 var localConfiguration = process.env.NODE_ENV == "production" ? statscoreConfigProduction : statscoreConfigDevelopment;
 
 
+const DetectCooldown = function (isLongCooldown, isMatchSimulated) {
+
+    if (isMatchSimulated) {
+        if (isLongCooldown)
+            return 90;
+        else
+            return 30;
+    }
+    else {
+        if (isLongCooldown)
+            return 9;
+        else
+            return 3;
+    }
+}
+
 // Settings properties
 
 let configuration = localConfiguration;
@@ -398,7 +414,7 @@ function Parser(matchContext, feedServiceContext) {
 
     // determines whether the match is simulated from previously recorded events in all_events kept in matchfeedstatuses
     this.simulationStep = 0;
-    this.isSimulated = feedServiceContext.simulatedfeed || false;
+    this.isSimulated = feedServiceContext.simulatedfeed || null;
     
     // the parser upon initialization will inquire about all team players and their parserids.
     this.matchPlayersLookup = {};
@@ -775,7 +791,7 @@ Parser.prototype.ConsumeMessage = function (message) {
                         if (!that.isPaused && that.feedService)
                             that.feedService.AddEvent(matchEvent);
                     }, 10000);
-                    that.status.coolDownUntil = now.clone().add(30, 's').toDate();
+                    that.status.coolDownUntil = now.clone().add(DetectCooldown(false, that.isSimulated), 's').toDate();
                 }
             }
         }
@@ -789,7 +805,7 @@ Parser.prototype.ConsumeMessage = function (message) {
         log.info(`[Statscore on ${that.matchHandler.name}]: Intercepted a Segment Advance event in event id ${message.data.event.id}`);
         if (!that.isPaused && that.feedService) {
             that.feedService.AdvanceMatchSegment(eventState);
-            that.status.coolDownUntil = now.clone().add(90, 's').toDate();
+            that.status.coolDownUntil = now.clone().add(DetectCooldown(true, that.isSimulated), 's').toDate();
         }
     }
 
@@ -811,7 +827,7 @@ Parser.prototype.ConsumeMessage = function (message) {
                     if (that.matchHandler.state == 3 || that.matchHandler.state == 7) {
                         // Add the finish event of the second half
                         that.feedService.AdvanceMatchSegment(that.matchHandler.state + 1);
-                        that.status.coolDownUntil = now.clone().add(90, 's').toDate();
+                        that.status.coolDownUntil = now.clone().add(DetectCooldown(true, that.isSimulated), 's').toDate();
                         setTimeout(() => {
                             // Send an event that the match is ended.
                             that.feedService.EndOfMatch();
@@ -838,7 +854,7 @@ Parser.prototype.ConsumeMessage = function (message) {
                 that.status.processedIncidentIds.push(incident.id);
                 if (!that.isPaused && that.feedService) {
                     that.feedService.AdvanceMatchSegment(eventState);
-                    that.status.coolDownUntil = now.clone().add(90, 's').toDate();
+                    that.status.coolDownUntil = now.clone().add(DetectCooldown(true, that.isSimulated), 's').toDate();
                 }
             }
 
@@ -853,7 +869,7 @@ Parser.prototype.ConsumeMessage = function (message) {
 
                     // If it is a new Goal, add it to parser status and inject an artificial shoot on target event right before
                     if (!isIncidentProcessed && SportimoGoalEvents[incident.incident_id]) {
-                        that.status.coolDownUntil = now.clone().add(30, 's').toDate();
+                        that.status.coolDownUntil = now.clone().add(DetectCooldown(false, that.isSimulated), 's').toDate();
 
                         if (incident.incident_id == 413 && !that.isPaused) {
                             let shootMessage = _.cloneDeep(message);
@@ -878,7 +894,7 @@ Parser.prototype.ConsumeMessage = function (message) {
                         if (!that.isPaused && goalEvent && that.feedService) {
                             setTimeout(() => {
                                 that.feedService.AddEvent(goalEvent);
-                                that.status.coolDownUntil = now.clone().add(30, 's').toDate();
+                                that.status.coolDownUntil = now.clone().add(DetectCooldown(false, that.isSimulated), 's').toDate();
                             }, 1000);
                         }
                     }
