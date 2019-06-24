@@ -646,7 +646,7 @@ Parser.prototype.StartQueueReplayer = function (matchParserId, matchParserEventI
                 setTimeout(() => {
                     Emitter.emit('event', event);
                     cbk(null);
-                }, 300);
+                }, 800);
             else
                 cbk(null);
         });
@@ -693,7 +693,7 @@ Parser.prototype.StartMatchFeedReplayer = function (matchParserId, matchParserEv
                 setTimeout(() => {
                     Emitter.emit('event', event);
                     cbk(null);
-                }, 300);
+                }, 800);
             else
                 cbk(null);
         });
