@@ -2,7 +2,9 @@
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema,
     ObjectId = Schema.Types.ObjectId,
-    async = require('async');
+    async = require('async'),
+    log = require('winston');
+
 var _ = require('lodash');
 
 
@@ -82,8 +84,10 @@ else {
                 const user = parallelResults[0];
                 const subscriptions = parallelResults[1];
 
-                if (!user || subscriptions.length === 0)
-                    return cbk(null);
+                if (!user || subscriptions.length === 0) {
+                    log.error(`Failed to add user activity to user ${userId} for match ${matchId}. No such user is found.`);
+                    return cbk(null, []);
+                }
 
                 const tournamentIds = _.map(subscriptions, 'tournament');
                 mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);

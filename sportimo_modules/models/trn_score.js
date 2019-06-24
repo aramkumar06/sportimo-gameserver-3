@@ -3,7 +3,8 @@
 var mongoose = require('mongoose'),
     Schema = mongoose.Schema,
     ObjectId = Schema.Types.ObjectId,
-    async = require('async');
+    async = require('async'),
+    log = require('winston');
 
 if (mongoose.models.trn_scores)
     module.exports = mongoose.models.trn_scores;
@@ -58,8 +59,10 @@ else {
                 user = parallelResults[0];
                 const subscriptions = parallelResults[1];
 
-                if (!user || subscriptions.length === 0)
-                    return cbk(null);
+                if (!user || subscriptions.length === 0) {
+                    log.error(`Failed to add score of ${points} to user ${userId} for match ${matchId}. No such user is found or no valid subscriptions exist.`);
+                    return cbk(null, []);
+                }
 
                 const tournamentIds = _.map(subscriptions, 'tournament');
                 mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
@@ -120,8 +123,10 @@ else {
                 user = parallelResults[0];
                 const subscriptions = parallelResults[1];
 
-                if (!user || subscriptions.length === 0)
-                    return cbk(null);
+                if (!user || subscriptions.length === 0) {
+                    log.error(`Failed to add leaderboard entry to user ${userId} for match ${matchId}. No such user is found or no valid subscriptions exist.`);
+                    return cbk(null, []);
+                }
 
                 const tournamentIds = _.map(subscriptions, 'tournament');
                 mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
