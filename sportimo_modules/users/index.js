@@ -216,7 +216,7 @@ apiRoutes.post('/v1/users/authenticate', function (req, res) {
         deletedAt: null
     })
      .populate({
-            path: 'favoriteteams',
+            path: 'favTeams',
             select: 'name',
             model: 'trn_teams'
         })
