@@ -109,15 +109,15 @@ api.deleteAllPrizes = function (req, res) {
 */
 
 
-router.post('/v1/prizes',api.addprize);
+router.post('/v1/data/prizes',api.addprize);
 
-router.route('/v1/prizes/:id')
+router.route('/v1/data/prizes/:id')
 .get(api.prize)
 .put(api.editPrize)
 .delete(api.deletePrize);
 
 
-router.route('/v1/prizes')
+router.route('/v1/data/prizes')
     .get(api.prizes);
 //.delete(api.deleteAllPrizes);
 

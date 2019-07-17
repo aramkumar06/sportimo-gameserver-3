@@ -6,12 +6,48 @@ const
     Users = require('../../models/user'),
     Tournament = require('../../models/tournament'),
     TournamentMatch = require('../../models/trn_match'),
+    GrandPrize = require('../../models/trn_grand_prize'),
     Scores = require('../../models/trn_score'),
     async = require('async'),
     _ = require('lodash');
 
 const api = {};
 
+
+api.getGrandPrizeLeaders = function (clientId, grandPrizeId, cb) {
+
+    let bestscores = 50;
+    async.waterfall([
+        (cbk) => GrandPrize
+            .findOne({ _id: grandPrizeId, client: clientId })
+            .populate({ path: 'leaderboardDefinition' })
+            .exec(cbk),
+        (grandPrize, cbk) => {
+            if (!grandPrize) {
+                const err = new Error('Not Found');
+
+                err.errorCode = 10005;
+                err.statusCode = 404; // Not Found
+
+                return cbk(err);
+            }
+
+            if (grandPrize.bestscores)
+                bestscores = grandPrize.bestscores;
+
+            Scores
+                .find({ client: clientId, created: { $gte: grandPrize.startFromDate, $lt: grandPrize.endToDate } })
+                .populate({ path: 'user_id', select: 'username pic level country' })
+                .exec(cbk);
+        },
+        (scores, cbk) => {
+            if (!scores)
+                return cbk(null);
+
+            return cbk(null, SortResults(scores, bestscores));
+        }
+    ], cb);
+};
 
 
 api.getTournamentLeaders = function (clientId, tournamentId, cb) {

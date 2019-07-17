@@ -136,7 +136,7 @@ api.renderArticle = function (req, res) {
                 data = {};
                 data.publishDate = "";
                 data.name = "";
-                datat.description = "Article not found."
+                data.description = "Article not found.";
             } else {
 
              if(!data.publication.title[lang])
