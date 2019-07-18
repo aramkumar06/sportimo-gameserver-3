@@ -3,8 +3,9 @@
 // Module dependencies.
 const mongoose = require('mongoose'),
     moment = require('moment'),
-    ObjectId = mongoose.Schema.Types.ObjectId,
+    ObjectId = mongoose.Types.ObjectId,
     Entity = mongoose.models.tournaments,
+    LeaderboardDef = mongoose.models.trn_leaderboard_defs,
     async = require('async'),
     _ = require('lodash'),
     api = {};
@@ -36,6 +37,7 @@ api.getAll = function (clientId, skip, limit, cb) {
 api.getById = function (clientId, id, cb) {
     Entity
         .findById(id)
+        .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
         .exec(function (err, entity) {
             if (!err && entity && (clientId !== entity.client.toHexString()))
                 err = new Error(`Conflict between provided clientId and tournament's referred client id`);
@@ -64,6 +66,7 @@ api.search = function (clientId, searchTerm, competitionId, cb) {
         query.competitionid = competitionId;
 
     Entity.find(query)
+        .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
         .exec(function (err, entities) {
             return cbf(cb, err, entities);
         });
@@ -115,7 +118,9 @@ api.add = function (clientId, entity, cb) {
 // PUT
 api.edit = function (clientId, id, updateData, cb) {
 
-    return Entity.findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData }, function (err, entity) {
+    return Entity.findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData })
+    .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+    .exec(function (err, entity) {
         cbf(cb, err, entity);
     });
 };
@@ -124,6 +129,56 @@ api.edit = function (clientId, id, updateData, cb) {
 // DELETE
 api.delete = function (clientId, id, cb) {
     return Entity.remove({ _id: id, client: clientId }).exec(function (err, entity) {
+        return cbf(cb, err, true);
+    });
+};
+
+
+// POST a new tournament leaderboard
+api.addLeaderboardDef = function (clientId, id, entity, cb) {
+
+    if (entity === undefined) {
+        cb('No entity provided. Please provide valid data to update.');
+    }
+
+    entity = new LeaderboardDef(entity);
+    entity.client = clientId;
+
+    async.waterfall([
+        cbk => entity.save(cbk),
+        (savedDef, cbk) => Entity
+            .findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: savedDef.id } })
+            .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+            .exec(cbk)
+    ], function (err, updatedEntity) {
+        cbf(cb, err, updatedEntity.toObject());
+    });
+};
+
+
+// PUT - update an existing tournament leaderboard
+api.editLeaderboardDef = function (clientId, id, updateData, cb) {
+
+    return LeaderboardDef.findOneAndUpdate({ _id: updateData._id, client: clientId }, {
+        $set: {
+            title: updateData.title,
+            info: updateData.info,
+            active: updateData.active,
+            country: updateData.country,
+            besstcores: updateData.bestscores,
+            prizes: updateData.prizes
+        }
+    }, cb);
+};
+
+
+// DELETE an existing tournament leaderboard
+api.deleteLeaderboardDef = function (clientId, id, cb) {
+
+    async.waterfall([
+        cbk => Entity.findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: null } }, cbk),
+        (updated, cbk) => LeaderboardDef.remove({ _id: updated.leaderboardDefinition }, cbk)
+    ], (err) => {
         return cbf(cb, err, true);
     });
 };
