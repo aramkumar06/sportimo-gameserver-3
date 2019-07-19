@@ -70,7 +70,7 @@ gamecards.init = function (tournamentMatch) {
                 callback(null, templates);
             });
         },
-        function (templates, callback) {
+        function (templates, callback) { 
             db.models.trn_card_definitions.find({ client: tournamentMatch.client, tournament: tournamentMatch.tournament, matchid: tournamentMatch.match.id }, function (error, definitions) {
 
                 if (error)
@@ -96,7 +96,7 @@ gamecards.init = function (tournamentMatch) {
         }
     ], function (error, result) {
         if (error)
-            log.error('Error while initializing gamecards module: ' + error.message);
+            log.error('Error while initializing gamecards module: ' + error.stack);
     });
 
 
@@ -163,7 +163,7 @@ gamecards.createMatchDefinitions = function (matchid, callback) {
         }
     ], function (error, result) {
         if (error)
-            log.error('Error while initializing gamecards module: ' + error.message);
+            log.error('Error while initializing gamecards module: ' + error.stack);
 
         return callback(error, result);
     });
@@ -1522,13 +1522,15 @@ gamecards.Tick = function () {
                         // },
                         function (parallelCbk) {
                             UserGamecard.find({ matchid: match.id, status: 0, cardType: 'PresetInstant', minute: { $lte: match.time }, segment: { $lte: match.state } }, function (error, userGamecards) {
-                                if (userGamecards.length > 0)
-                                    console.log("Preset Found");
 
                                 if (error) {
                                     log.error('Failed to activate PresetInstant user gamecards at match minute ' + match.minute + ' of match id %s !!!', match.id);
+                                    log.error(`due to: ${error.stack}`);
                                     return parallelCbk(null);
                                 }
+
+                                if (userGamecards.length > 0)
+                                    console.log("Preset Found");
 
                                 if (!userGamecards || userGamecards.length == 0)
                                     return parallelCbk(null);
@@ -1563,6 +1565,7 @@ gamecards.Tick = function () {
                                 UserGamecard.update({ matchid: match.id, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
                                     if (error) {
                                         log.error('Failed to pause user gamecards after segment ' + (match.state - 1) + ' ends on match id %s !!!', match.id);
+                                        log.error(`due to: ${error.stack}`);
                                         return parallelCbk(null);
                                     }
                                 });
@@ -1597,6 +1600,7 @@ gamecards.Tick = function () {
                             UserGamecard.find(wildcardsQuery, function (error, data) {
                                 if (error) {
                                     log.error("Error while resolving event: " + error.message);
+                                    log.error(`due to: ${error.stack}`);
                                     return parallelCbk(error);
                                 }
 
@@ -1631,6 +1635,7 @@ gamecards.Tick = function () {
                             UserGamecard.find(wildcardsQuery, function (error, data) {
                                 if (error) {
                                     log.error("Error while resolving event: " + error.message);
+                                    log.error(`due to: ${error.stack}`);
                                     return parallelCbk(error);
                                 }
 
@@ -1821,7 +1826,7 @@ gamecards.CheckIfWins = function (gamecard, isCardTermination, simulatedWinTime,
         // Give Platform Rewards (update scores for leaderboards, user score, stats, achievements)
         gamecards.HandleUserCardRewards(gamecard.userid, gamecard.matchid, gamecard.cardType, gamecard.primaryStatistic, gamecard.minute, gamecard.pointsAwarded, function (err, result) {
             if (err)
-                log.error(err.message);
+                log.error(err.stack);
         });
 
         const gamecardName = {
@@ -2023,7 +2028,7 @@ gamecards.GamecardsTerminationHandle = function (mongoGamecards, event, match, c
         if (gamecardChanged)
             gamecard.save(function (err) {
                 if (err) {
-                    log.error(err.message);
+                    log.error(err.stack, gamecard.toObject());
                     return parallelCbk(err);
                 }
 
@@ -2266,6 +2271,7 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
         UserGamecard.update({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
             if (error) {
                 log.error('Failed to pause user gamecards after segment ' + (segmentIndex - 1) + ' ends on match id %s !!!', matchId);
+                log.error(`due to: ${error.stack}`);
                 return error;
             }
         });
@@ -2276,6 +2282,7 @@ gamecards.ResolveSegment = function (matchId, segmentIndex) {
             UserGamecard.find({ matchid: matchId, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 3 }, function (error, userGamecards) {
                 if (error) {
                     log.error('Failed to resume paused cards after segment ' + segmentIndex + ' starts again on match id %s !!!', matchId);
+                    log.error(`due to: ${error.stack}`);
                     return error;
                 }
 
@@ -2386,7 +2393,7 @@ gamecards.ResolveEvent = function (matchEvent) {
             });
         }, function (err) {
             if (err) {
-                log.error(err.message);
+                log.error(err.stack);
                 return outerCbk(err);
             }
 
@@ -2441,7 +2448,7 @@ gamecards.ResolveEvent = function (matchEvent) {
                     let mongoGamecards;
                     UserGamecard.find(gamecardsQuery, function (error, data) {
                         if (error) {
-                            log.error("Error while resolving event: " + error.message);
+                            log.error(`Error while resolving event due to: ${error.stack}`, gamecardsQuery);
                             return callback(error);
                         }
 
@@ -2479,7 +2486,7 @@ gamecards.ResolveEvent = function (matchEvent) {
 
                                 UserGamecard.find(wildcardsQuery, function (error, data) {
                                     if (error) {
-                                        log.error("Error while resolving event: " + error.message);
+                                        log.error(`Error while resolving event due to: ${error.stack}`, wildcardsQuery);
                                         return callback(error);
                                     }
 
@@ -2501,7 +2508,7 @@ gamecards.ResolveEvent = function (matchEvent) {
                                 });
                             }
                             catch (innerError) {
-                                log.error("Error while resolving event: " + innerError.message);
+                                log.error("Error while resolving event: " + innerError.stack);
                                 return callback(innerError);
                             }
 
@@ -2509,7 +2516,7 @@ gamecards.ResolveEvent = function (matchEvent) {
                     });
                 }
                 catch (error) {
-                    log.error("Error while resolving event: " + error.message);
+                    log.error("Error while resolving event: " + error.stack);
                     return callback(error);
                 }
             }, function (error) {
@@ -3062,7 +3069,7 @@ gamecards.TerminateMatch = function (match, callback) {
     var cardsCount;
     UserGamecard.find(gamecardsQuery, function (error, mongoGamecards) {
         if (error) {
-            log.error("Error while resolving event: " + error.message);
+            log.error("Error while resolving event: " + error.stack);
             if (callback)
                 return callback(error);
             else
@@ -3105,7 +3112,7 @@ gamecards.TerminateMatch = function (match, callback) {
         async.eachLimit(mongoGamecards, 500, (gamecard, asyncCbk) => {
             gamecard.save(function (err) {
                 if (err) {
-                    log.error(err.message);
+                    log.error(err.stack);
                 }
                 return asyncCbk(null);
             });
