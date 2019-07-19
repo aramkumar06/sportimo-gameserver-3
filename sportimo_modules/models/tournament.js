@@ -19,6 +19,7 @@ else {
         //termsAndConditionsText: { type: Schema.Types.Mixed },
         titleText: { type: Schema.Types.Mixed },
         infoText: { type: Schema.Types.Mixed },
+        detailText: { type: Schema.Types.Mixed },
         discountText: { type: String },
         startFromDate: { type: Date },
         endToDate: { type: Date },
