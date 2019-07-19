@@ -86,7 +86,12 @@ api.getTeamFull = function (id, cb) {
 
 // Returns results matching the searchTerm
 api.searchTeams = function (searchTerm, competitionId, cb) {
-    var query = { $or: [{ 'name.en': new RegExp(searchTerm, 'i') }, { $text: { $search: searchTerm } }] };
+    var query = {
+        $or: [
+            { 'name.en': new RegExp(searchTerm, 'i') }
+            //{ $text: { $search: searchTerm } }
+        ]
+    };
     if (competitionId)
         query.competitionid = competitionId;
 

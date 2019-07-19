@@ -93,7 +93,7 @@ api.getByTeam = function (teamId, cb) {
 
     Team
         .findOne({ _id: teamId })
-        .populate({ path: 'players', match: query, select: 'name position' })
+        .populate({ path: 'players', select: 'name position' })
         .exec((err, team) => {
             if (err)
                 return cb(err);
