@@ -53,12 +53,12 @@ api.search = function (clientId, searchTerm, competitionId, cb) {
     const query = {
         client: clientId,
         $or: [
-            { 'aboutText.en': searchExp },
-            { 'aboutText.ar': searchExp },
-            { 'howToParticipateText.en': searchExp },
-            { 'howToParticipateText.ar': searchExp },
-            { 'howToPlayText.en': searchExp },
-            { 'howToPlayText.ar': searchExp }
+            { 'titleText.en': searchExp },
+            { 'v.ar': searchExp },
+            { 'infoText.en': searchExp },
+            { 'infoText.ar': searchExp },
+            { 'detailText.en': searchExp },
+            { 'detailText.ar': searchExp }
             //{ $text: { $search: searchTerm } }
         ]
     };
@@ -118,7 +118,9 @@ api.add = function (clientId, entity, cb) {
 // PUT
 api.edit = function (clientId, id, updateData, cb) {
 
-    return Entity.findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData })
+    updateData.updated = new Date();
+
+    return Entity.findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData }, { new: true })
     .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
     .exec(function (err, entity) {
         cbf(cb, err, entity);
@@ -147,7 +149,7 @@ api.addLeaderboardDef = function (clientId, id, entity, cb) {
     async.waterfall([
         cbk => entity.save(cbk),
         (savedDef, cbk) => Entity
-            .findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: savedDef.id } })
+            .findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: savedDef.id } }, { new: true })
             .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
             .exec(cbk)
     ], function (err, updatedEntity) {
@@ -168,7 +170,9 @@ api.editLeaderboardDef = function (clientId, id, updateData, cb) {
             besstcores: updateData.bestscores,
             prizes: updateData.prizes
         }
-    }, cb);
+    },
+    { new: true },
+    cb);
 };
 
 
@@ -176,7 +180,7 @@ api.editLeaderboardDef = function (clientId, id, updateData, cb) {
 api.deleteLeaderboardDef = function (clientId, id, cb) {
 
     async.waterfall([
-        cbk => Entity.findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: null } }, cbk),
+        cbk => Entity.findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: null } }, { new: true }, cbk),
         (updated, cbk) => LeaderboardDef.remove({ _id: updated.leaderboardDefinition }, cbk)
     ], (err) => {
         return cbf(cb, err, true);
