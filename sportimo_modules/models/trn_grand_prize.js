@@ -17,6 +17,7 @@ else {
 
         titleText: { type: Schema.Types.Mixed },
         infoText: { type: Schema.Types.Mixed },
+        detailText: { type: Schema.Types.Mixed },
 
         promoImage: { type: String },
 

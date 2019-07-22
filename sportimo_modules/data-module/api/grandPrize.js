@@ -49,14 +49,28 @@ router.post('/v1/data/grand-prizes', (req, res) => {
         return res.status(400).json({ error: objectValidation.error });
 
     const newPrizeObj = new grandPrize(newPrize);
-    newPrizeObj.save((err, savedPrize) => {
+
+    // Assume that there can be no more than ONE grand prize (or none)
+    async.waterfall([
+        cbk => grandPrize.count({ active: { $ne: false } }, cbk),
+        (grandPrizeCount, cbk) => {
+            if (grandPrizeCount >= 2) {
+                const err = new Error('There could be no more than 1 grand prize active at any time');
+                err.statusCode = 403; // Forbidden
+                err.errorCode = 10001;
+                return cbk(err);
+            }
+
+            newPrizeObj.save(cbk);
+        }
+    ], (err, savedPrize) => {
         if (err) {
             logger.error(`Error saving grand prize ${newPrizeObj.toObject()}: ${err.stack}`);
-            return res.status(500).json(err);
+            return res.status(err.statusCode || 500).json(err);
         }
 
         return res.json(savedPrize);
-    });
+    });  
 });
 
 
@@ -140,6 +154,8 @@ router.get('/v1/data/client/:clientId/grand-prizes', (req, res) => {
         endToDate: { $gt: now } // maybe comment this one
     })
     .populate('prizes.prize')
+    // We place a limit under the assumption that up to ONE grand prize may exist
+    .limit(1)
     .exec(function (err, data) {
         if (err) {
             logger.error(`Error getting all active grand prizes: ${err.stack}`);
