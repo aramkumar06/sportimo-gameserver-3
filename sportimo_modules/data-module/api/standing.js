@@ -2,7 +2,7 @@
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
-    item = mongoose.models.trn_standings,
+    item = mongoose.models.trn_team_standings,
     logger = require('winston'),
     api = {};
 var knockouts = mongoose.models.knockoutStandings,
@@ -14,10 +14,11 @@ api.items = function (req, res) {
     var skip = null, limit = null;
     //  publishDate: { $gt: req.body.minDate, $lt: req.body.maxDate }, type: req.body.type, tags: { "$regex": req.body.tags, "$options": "i" }
     var queries = {};
-    var userCountry = req.params.country;
 
 
-    var q = item.find({ $or: [{ visiblein: userCountry }, { visiblein: { $exists: false } }, { visiblein: { $size: 0 } }] });
+    var q = item.find({});
+    q.populate('competition');
+    q.populate('season', '-teams');
 
     q.exec(function (err, items) {
         if (err) {
@@ -48,21 +49,23 @@ api.itemsSearch = function (req, res) {
         }
     }
 
-    if (req.body.tags != undefined)
+    if (!req.body.tags !== undefined)
         queries['tags.name.en'] = { "$regex": req.body.tags, "$options": "i" };
 
-    if (req.body.related != undefined)
+    if (req.body.related !== undefined)
         queries['tags._id'] = req.body.related;
 
-    if (req.body.type != undefined)
+    if (req.body.type !== undefined)
         queries.type = req.body.type;
 
     // if(req.params.season)
     //     queries.season = req.params.season;
 
     var q = item.find(queries);
+    q.populate('competition');
+    q.populate('season', '-teams');
 
-    if (req.body.limit != undefined)
+    if (req.body.limit > 0)
         q.limit(req.body.limit);
 
     q.exec(function (err, items) {
@@ -92,38 +95,7 @@ api.additem = function (req, res) {
 
 };
 
-api.updateVisibility = function (req, res) {
 
-    // console.log(req.body.competitionid);
-
-
-    item.find({ competitionid: req.body.competitionid }, function (err, standings) {
-
-        if (standings) {
-            standings.forEach(function (standing) {
-                standing.visiblein = req.body.visiblein;
-                standing.save(function (err, data) {
-                    if (err) {
-                        logger.log('error', err.stack, req.body);
-                        return res.status(500).json(data);
-                    }
-                })
-            })
-            res.status(200).send();
-        } else {
-            console.log("404");
-            res.status(404).send();
-        }
-    });
-
-
-};
-var GetSeasonYear = function () {
-    var now = new Date();
-    if (now.getMonth() > 6)
-        return now.getFullYear();
-    else return now.getFullYear() - 1;
-};
 // GET
 api.item = function (req, res) {
     // var id = req.params.id;
@@ -152,65 +124,80 @@ api.item = function (req, res) {
 
 api.getCompetition = function (competitionid, season, res) {
 
-    item.findOne({competitionid: competitionid, season: season}, function (err, returnedItem) {
-        if (!err) {
-            if (returnedItem || season == 2016) {
-                knockouts.findOne({ competitionid: competitionid, season: season }, function (err, standingKnockouts) {
-                    if (!err) {
-                        if (returnedItem) {
-                            returnedItem = returnedItem.toObject();
-                            returnedItem.knockouts = standingKnockouts;
+    item
+        .findOne({ competition: competitionid, season: season })
+        .populate('competition')
+        .populate('season', '-teams')
+        .exec(function (err, returnedItem) {
+
+            if (!err) {
+                if (returnedItem || season == 2016) {
+                    knockouts.findOne({ competitionid: competitionid, season: season }, function (err, standingKnockouts) {
+                        if (!err) {
+                            if (returnedItem) {
+                                returnedItem = returnedItem.toObject();
+                                returnedItem.knockouts = standingKnockouts;
+                            }
+                            return res.status(200).json(returnedItem);
+                        } else {
+                            logger.log('error', err.stack, req.body);
+                            return res.status(500).json(err);
                         }
-                        return res.status(200).json(returnedItem);
-                    } else {
-                        logger.log('error', err.stack, req.body);
-                        return res.status(500).json(err);
-                    }
-                });
+                    });
+                }
+            } else {
+                logger.log('error', err.stack, req.body);
+                return res.status(500).json(err);
             }
-            else
-                api.getCompetition(competitionid, season - 1, res);
-        } else {
-            logger.log('error', err.stack, req.body);
-            return res.status(500).json(err);
-        }
-    });
-}
+        });
+};
 
 // PUT
 api.edititem = function (req, res) {
     var id = req.params.id;
     var updateData = req.body;
-    item.findById(id, function (err, returnedItem) {
+    item
+        .findById(id)
+        .populate('competition')
+        .populate('season', '-teams')
+        .exec(function (err, returnedItem) {
 
-        if (updateData === undefined || returnedItem === undefined) {
-            return res.status(400).json("Error: Data is not correct.");
-        }
-
-        returnedItem.photo = updateData.photo;
-        returnedItem.tags = updateData.tags;
-        areturnedItemrt.publishDate = updateData.publishDate;
-        returnedItem.type = updateData.type;
-        returnedItemart.publication = updateData.publication;
-        // art.markModified('tags');
-
-        return returnedItem.save(function (err, data) {
-            if (!err) {
-                return res.status(200).json(data);
-            } else {
-                logger.log('error', err.stack, req.body);
-                return res.status(500).json(err);
+            if (!updateData) {
+                return res.status(400).json({ error: 'Data is not correct.' });
             }
-        }); //eo team.save
-    });// eo team.find
 
+            if (updateData.groups) {
+                returnedItem.groups = updateData.groups;
+                returnedItem.markModified('groups');
+            }
+            if (updateData.teams) {
+                returnedItem.teams = updateData.teams;
+                returnedItem.markModified('teams');
+            }
+            if (updateData.name) {
+                returnedItem.name = updateData.name;
+                returnedItem.markModified('name');
+            }
+            updateData.lastupdate = new Date();
 
+            return returnedItem.save(function (err, data) {
+                if (!err) {
+                    return res.status(200).json(data);
+                } else {
+                    logger.log('error', err.stack, req.body);
+                    return res.status(500).json(err);
+                }
+            }); //eo team.save
+        });// eo team.find
 };
 
 // DELETE
 api.deleteitem = function (req, res) {
     var id = req.params.id;
 
+    item.removeById(id, (err) => {
+        return res.status(200).json({ success: true });
+    });
 };
 
 
@@ -223,8 +210,6 @@ router.route('/v1/data/standings/')
     .get(api.itemsSearch);
 
 router.post('/v1/data/standings', api.additem);
-
-router.post('/v1/data/standings/visibility', api.updateVisibility);
 
 router.route('/v1/data/standings/country/:country')
     .get(api.items);

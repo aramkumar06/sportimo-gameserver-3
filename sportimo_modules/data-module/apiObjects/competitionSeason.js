@@ -1,8 +1,8 @@
 // Module dependencies.
 var mongoose = require('mongoose'),
-Competition = mongoose.models.trn_competitions,
+Entity = mongoose.models.trn_competition_seasons,
 Matches = mongoose.models.matches,
-Standings = mongoose.models.trn_team_standings,
+Standings = mongoose.models.trn_standings,
 api = {},
 l=require('../config/lib');
 
@@ -13,9 +13,9 @@ l=require('../config/lib');
 */
 
 // ALL
-api.getAllCompetitions = function (skip, limit, status, cb) {
+api.getAllInstances = function (skip, limit, status, cb) {
  
-    var q = Competition.find(status ? { status: status } : {});
+    var q = Entity.find(status ? { status: status } : {});
     q.populate('competition');
     q.populate({ path: 'teams', select: 'name logo abbr' });
   
@@ -32,33 +32,33 @@ api.getAllCompetitions = function (skip, limit, status, cb) {
 };
 
 // GET
-api.getCompetition = function (id,cb) {
+api.getInstance = function (id,cb) {
 
-  Competition.findOne({ '_id': id }).populate('competition').exec(function(err, competition) {
+    Entity.findOne({ '_id': id }).populate('competition').exec(function(err, competition) {
     cbf(cb,err,competition);
   });
 };
 
 // POST
-api.addCompetition = function (competition,cb) {
+api.addInstance = function (competition, cb) {
 
   if(competition == 'undefined'){
-    cb('No Competition Provided. Please provide valid competition data.');
+    cb('No Instance Provided. Please provide valid competition data.');
   }
 
-  competition = new Competition(competition);
+    competition = new Entity(competition);
 
-  competition.save(function (err) {
-    cbf(cb,err,competition.toObject());
-  });
+    competition.save(function (err) {
+        cbf(cb,err,competition.toObject());
+    });
 };
 
 // PUT
-api.editCompetition = function (id,updateData, cb) {
+api.editInstance = function (id, updateData, cb) {
 
     var update = updateData;//.toObject();
     // delete update._id;
-    Competition.findByIdAndUpdate(id, update, function (err, competition) {
+    Entity.findByIdAndUpdate(id, update, function (err, competition) {
         if (err) {
             return cbf(cb, err, null);
         }
@@ -76,8 +76,8 @@ api.editCompetition = function (id,updateData, cb) {
 };
 
 // DELETE
-api.deleteCompetition = function (id,cb) {
-  return Competition.findById(id).remove().exec(function (err, competition) {
+api.deleteInstance = function (id,cb) {
+    return Entity.findById(id).remove().exec(function (err, competition) {
    return cbf(cb,err,true);      
  });
 };
@@ -94,8 +94,8 @@ api.test=function (cb) {
 };
 
 
-api.deleteAllCompetitions = function (cb) {
-  return Competition.remove({},function (err) {
+api.deleteAllInstances = function (cb) {
+  return Instance.remove({},function (err) {
     cbf(cb,err,true);      
   });
 };
