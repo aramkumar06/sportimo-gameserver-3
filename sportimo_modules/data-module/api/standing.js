@@ -11,14 +11,17 @@ var knockouts = mongoose.models.knockoutStandings,
 
 api.items = function (req, res) {
 
-    var skip = null, limit = null;
-    //  publishDate: { $gt: req.body.minDate, $lt: req.body.maxDate }, type: req.body.type, tags: { "$regex": req.body.tags, "$options": "i" }
-    var queries = {};
-
+    var skip = req.query.skip, limit = req.query.limit;
 
     var q = item.find({});
     q.populate('competition');
     q.populate('season', '-teams');
+
+    if (skip)
+        q.skip(skip);
+
+    if (req.body.limit > 0)
+        q.limit(limit);
 
     q.exec(function (err, items) {
         if (err) {
@@ -33,46 +36,28 @@ api.items = function (req, res) {
 
 // ALL
 api.itemsSearch = function (req, res) {
-    var skip = null, limit = null;
-    //  publishDate: { $gt: req.body.minDate, $lt: req.body.maxDate }, type: req.body.type, tags: { "$regex": req.body.tags, "$options": "i" }
+
+    var skip = req.query.skip, limit = req.query.limit;
     var queries = {};
-
-    if (req.body.minDate != undefined || req.body.maxDate != undefined) {
-        queries.publishDate = {};
-        if (req.body.minDate == req.body.maxDate) {
-            queries.publishDate.$eq = req.body.minDate;
-        } else {
-            if (req.body.minDate != undefined)
-                queries.publishDate.$gte = req.body.minDate;
-            if (req.body.maxDate != undefined)
-                queries.publishDate.$lt = req.body.maxDate;
-        }
-    }
-
-    if (!req.body.tags !== undefined)
-        queries['tags.name.en'] = { "$regex": req.body.tags, "$options": "i" };
-
-    if (req.body.related !== undefined)
-        queries['tags._id'] = req.body.related;
-
-    if (req.body.type !== undefined)
-        queries.type = req.body.type;
-
-    // if(req.params.season)
-    //     queries.season = req.params.season;
 
     var q = item.find(queries);
     q.populate('competition');
     q.populate('season', '-teams');
 
+    if (skip)
+        q.skip(skip);
+
     if (req.body.limit > 0)
-        q.limit(req.body.limit);
+        q.limit(limit);
 
     q.exec(function (err, items) {
+        if (err) {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        }
 
         return res.send(items);
     });
-
 };
 
 // POST

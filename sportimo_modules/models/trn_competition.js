@@ -13,6 +13,7 @@ else {
         logo: { type: String },
         graphics: { type: Schema.Types.Mixed },
         parserids: { type: Schema.Types.Mixed },
+        status: { type: String, enum: ['Active', 'Disabled'] },
 
         created: { type: Date, default: Date.now }
     };

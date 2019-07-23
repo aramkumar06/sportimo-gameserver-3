@@ -11,13 +11,13 @@ else {
     var competitionSeason = {
 
         competition: { type: ObjectId, ref: 'trn_competitions' },
-        visiblein: [String],
+        //visiblein: [String],
         name: { type: Schema.Types.Mixed },
 
         startDate: { type: Date },
         startYear: { type: Number },
         endYear: { type: Number },
-        status: { type: String, enum: ['active', 'inactive'] },
+        status: { type: String, enum: ['Active', 'Disabled'] },
 
         teams: [{ type: ObjectId, ref: 'trn_teams' }],
         parserids: { type: Schema.Types.Mixed },
