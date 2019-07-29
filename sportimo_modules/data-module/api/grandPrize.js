@@ -55,10 +55,10 @@ router.post('/v1/data/grand-prizes', (req, res) => {
         cbk => grandPrize.count({ active: { $ne: false } }, cbk),
         (grandPrizeCount, cbk) => {
             if (grandPrizeCount >= 2) {
-                const err = new Error('There could be no more than 1 grand prize active at any time');
-                err.statusCode = 403; // Forbidden
-                err.errorCode = 10001;
-                return cbk(err);
+                //const err = new Error('There could be no more than 1 grand prize active at any time');
+                //err.statusCode = 403; // Forbidden
+                //err.errorCode = 10001;
+                //return cbk(err);
             }
 
             newPrizeObj.save(cbk);
