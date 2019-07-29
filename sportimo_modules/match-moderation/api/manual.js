@@ -49,12 +49,10 @@ module.exports = function (ModerationModule) {
         log.info("[Reload Match] Request for matchid [" + req.body.id + "]");
         ModerationModule.LoadMatchFromDB(req.body.id, function (err, result) {
             if (!err)
-                res.send(result);
+                return res.send(result);
             else
-                res.sendStatus(500).send(err);
+                return res.status(500).send(err);
         });
-
-        // ModerationModule.LoadMatchFromDB(req.body.id, res);
     });
 
 
