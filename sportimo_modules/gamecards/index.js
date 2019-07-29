@@ -130,7 +130,7 @@ gamecards.createMatchDefinitions = function (matchid, callback) {
             });
         },
         function (match, callback) {
-            db.models.trn_card_templates.find({}, function (error, templates) {
+            db.models.trn_card_templates.find({ isActive: true }, function (error, templates) {
                 if (error)
                     return callback(error);
                 callback(null, templates, match);
