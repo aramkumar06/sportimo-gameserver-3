@@ -97,6 +97,7 @@ router.put('/v1/data/grand-prizes/:prizeId', (req, res) => {
             prize.titleText = prizeToUpdate.titleText;
             prize.infoText = prizeToUpdate.infoText;
             prize.promoImage = prizeToUpdate.promoImage;
+            prize.promoDetailImage = prizeToUpdate.promoDetailImage;
             prize.startFromDate = prizeToUpdate.startFromDate;
             prize.endToDate = prizeToUpdate.endToDate;
             prize.active = prizeToUpdate.active;

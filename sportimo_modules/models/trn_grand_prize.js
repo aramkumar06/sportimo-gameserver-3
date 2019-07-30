@@ -20,6 +20,7 @@ else {
         detailText: { type: Schema.Types.Mixed },
 
         promoImage: { type: String },
+        promoDetailImage: { type: String },
 
         startFromDate: { type: Date },
         endToDate: { type: Date },
