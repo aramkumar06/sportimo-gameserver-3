@@ -33,7 +33,7 @@ const findReplayableMatches = function (competitionId, callback) {
                 icbk => scheduledMatches.find(query, { timeline: 0, stats: 0 })
                     .populate('home_team away_team')
                     .exec(icbk),
-                icbk => trnCompetitionSeasons.find({ status: 'active' }, '-teams').populate('competition', 'name logo').exec(icbk)
+                icbk => trnCompetitionSeasons.find({ status: 'Active' }, '-teams').populate('competition', 'name logo').exec(icbk)
             ], cbk);
         },
         (parallelResults, cbk) => {

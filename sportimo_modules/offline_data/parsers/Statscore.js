@@ -1433,7 +1433,7 @@ const GetLeagueFromMongo = function (competitionId, seasonId, populateTeams, cal
         q = mongoDb.trn_competition_seasons.findById(seasonId);
     else
         if (competitionId)
-            q = mongoDb.trn_competition_seasons.findOne({ competition: competitionId, status: 'active' });
+            q = mongoDb.trn_competition_seasons.findOne({ competition: competitionId, status: 'Active' });
         else
             return callback(new Error('No competition/ season ids are declared. Aborting.'));
 
@@ -1656,7 +1656,7 @@ Parser.UpdateStandings = function (season, callback) {
 
     // Get all competitions from Mongo
     mongoDb.trn_competition_seasons
-        .find({ status: 'active', ['parserids.' + Parser.Name]: { $exists: true } })
+        .find({ status: 'Active', ['parserids.' + Parser.Name]: { $exists: true } })
         .populate('competition')
         .exec( function (competitionError, competitionSeasons) {
         if (competitionError)
