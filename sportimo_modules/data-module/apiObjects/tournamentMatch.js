@@ -41,8 +41,13 @@ api.getAll = function (tournamentId, skip, limit, cb) {
 
 // GET
 api.getById = function (tournamentId, id, cb) {
+
+    const query = { _id: id };
+    if (tournamentId)
+        query.tournament = tournamentId;
+
     Entity
-        .findOne({ _id: id, tournament: tournamentId })
+        .findOne(query)
         .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }])
         .exec(function (err, entity) {
             if (entity && tournamentId !== entity.tournament)
