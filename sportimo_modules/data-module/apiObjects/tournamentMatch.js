@@ -3,7 +3,7 @@
 // Module dependencies.
 var mongoose = require('mongoose'),
     moment = require('moment'),
-    ObjectId = mongoose.Schema.Types.ObjectId,
+    ObjectId = mongoose.Types.ObjectId,
     _ = require('lodash'),
     async = require('async'),
     Entity = mongoose.models.trn_matches,
@@ -42,15 +42,15 @@ api.getAll = function (tournamentId, skip, limit, cb) {
 // GET
 api.getById = function (tournamentId, id, cb) {
 
-    const query = { _id: id };
+    const query = { _id: new ObjectId(id) };
     if (tournamentId)
-        query.tournament = tournamentId;
+        query.tournament = new ObjectId(tournamentId);
 
     Entity
         .findOne(query)
         .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }])
         .exec(function (err, entity) {
-            if (entity && tournamentId !== entity.tournament)
+            if (entity && tournamentId && tournamentId !== entity.tournament)
                 err = new Error(`Conflict between the path-provided tournamentId and tournament's referred tournament id`);
 
             cbf(cb, err, entity);

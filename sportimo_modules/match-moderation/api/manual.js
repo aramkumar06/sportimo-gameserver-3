@@ -79,10 +79,26 @@ module.exports = function (ModerationModule) {
                     return res.send(strippedMatch);
             }
             catch (err) {
-                return res.send(err);
+                return res.status(500).send(err);
             }
         });
+    });
 
+    router.get('/v1/live/tournament-match/:id', function (req, res) {
+        ModerationModule.GetTournamentMatch(req.params.id, (err, result) => {
+            if (err)
+                return res.status(500).json(err);
+
+            ModerationModule.GetTournamentMatches(result.id, null, (err, tMatches) => {
+                if (!err)
+                    result.tournamentMatch = _.find(tMatches, m => m._id.toHexString() === req.params.id);
+
+                delete result.services;
+                delete result.Timers;
+
+                return res.json(result);
+            });
+        });
     });
 
     // Set up manual Moderation Routes
