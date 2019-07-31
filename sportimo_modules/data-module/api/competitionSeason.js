@@ -30,7 +30,7 @@ api.getInstances = function (req, res) {
 
 // POST
 api.addInstance = function (req, res) {
-    Entity.addInstance(req.body.competition,function	(err,data){
+    Entity.addInstance(req.body, function (err,data){
         if (err) {
             logger.log('error', err.stack, req.body);
             res.status(500).json(err);

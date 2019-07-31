@@ -30,7 +30,7 @@ api.competitions = function (req, res) {
 
 // POST
 api.addcompetition = function (req, res) {
-	competition.addCompetition(req.body.competition,function	(err,data){
+	competition.addCompetition(req.body, function (err,data) {
         if (err) {
             logger.log('error', err.stack, req.body);
             res.status(500).json(err);
