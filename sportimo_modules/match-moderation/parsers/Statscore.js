@@ -414,7 +414,8 @@ function Parser(matchContext, feedServiceContext) {
 
     // determines whether the match is simulated from previously recorded events in all_events kept in matchfeedstatuses
     this.simulationStep = 0;
-    this.isSimulated = feedServiceContext.simulatedfeed || null;
+    this.isFeedReplay = feedServiceContext.simulatedfeed || null;
+    this.isSimulated = !!this.isFeedReplay;
     
     // the parser upon initialization will inquire about all team players and their parserids.
     this.matchPlayersLookup = {};
@@ -563,7 +564,7 @@ Parser.prototype.init = function (cbk) {
             log.info(`[Statscore on ${that.matchHandler.name}]: Queue listener started immediately for matchid ${that.matchHandler.id}`);
             return async.parallel([
                 (asyncCbk) => {
-                    if (that.isSimulated) {
+                    if (that.isFeedReplay) {
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
                         return asyncCbk(null);
                     }
@@ -586,7 +587,7 @@ Parser.prototype.init = function (cbk) {
 
                 that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
                     log.info(`[Statscore on ${that.matchHandler.name}]: Scheduled queue listener started for matchid ${that.matchHandler.id}`);
-                    if (that.isSimulated)
+                    if (that.isFeedReplay)
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
 
                     // !! Uncomment before PRODUCTION !!
@@ -616,7 +617,7 @@ Parser.prototype.init = function (cbk) {
                 return cbk(null);
             }
             else {
-                if (that.isSimulated) {
+                if (that.isFeedReplay) {
 
                     that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
                         log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
@@ -941,7 +942,8 @@ Parser.prototype.ConsumeMessage = function (message) {
             }
 
         // In any case, save event, except if this is a simulated session
-        if (!that.isSimulated && that.feedService && (that.status.isTerminated || SportimoTimelineEvents[incident.incident_id] || SegmentProgressionEvents[incident.incident_id])) {
+        if ((!that.isSimulated || that.isFeedReplay) && that.feedService && (that.status.isTerminated || SportimoTimelineEvents[incident.incident_id] || SegmentProgressionEvents[incident.incident_id])) {
+        //if (!that.isSimulated && that.feedService && (that.status.isTerminated || SportimoTimelineEvents[incident.incident_id] || SegmentProgressionEvents[incident.incident_id])) {
             //that.allEventsQueue.push(message); // this list considerably raises memory consumption until the end of the match, with an average of 500 messages held in-memory
 
             that.feedService.SaveParsedEvents(that.Name, that.matchHandler.id, that.sportimoEventIdsQueue, that.pendingMessages, null, [], that.status);
@@ -952,7 +954,8 @@ Parser.prototype.ConsumeMessage = function (message) {
         // Get generic information about the match, not timeline info, such as pitch conditions, weather, other event details
     }
 
-    if (!that.isSimulated && that.feedService) {
+    if ((!that.isSimulated || that.isFeedReplay) && that.feedService) {
+    //if (!that.isSimulated && that.feedService) {
         that.pendingMessages.push(message);
 
         // Add the id to known and processed event ids
