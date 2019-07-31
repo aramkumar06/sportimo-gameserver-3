@@ -64,7 +64,7 @@ gamecards.init = function (tournamentMatch) {
     // Check if match has trn_card_definitions written in mongo from the trn_card_templates and if their appearanceConditions are met, if not, create them.
     async.waterfall([
         function (callback) {
-            db.models.trn_card_templates.find({ client: tournamentMatch.client, tournament: tournamentMatch.tournament, isActive: true }, function (error, templates) {
+            db.models.trn_card_templates.find({ client: tournamentMatch.client._id.toHexString(), isActive: true }, function (error, templates) {
                 if (error)
                     return callback(error);
                 callback(null, templates);
@@ -82,7 +82,7 @@ gamecards.init = function (tournamentMatch) {
                 //callback(null, definitions);
                 let usedTemplateIds = [];
                 _.forEach(definitions, function (definition) {
-                    if (_.indexOf(usedTemplateIds, definition.gamecardTemplateId))
+                    if (_.indexOf(usedTemplateIds, definition.gamecardTemplateId) === -1)
                         usedTemplateIds.push(definition.gamecardTemplateId);
                 });
 

@@ -359,14 +359,15 @@ var ModerationModule = {
             ModerationModule.ModeratedMatchLookup[hookedMatch.id] = [tournamentMatch];
             log.info(`[Moderation] Found match with ID [${tmatchId}] ([${matchId}]). Creating match instance.`);
 
-            // Initiate gamecards logic, if not already, and create card definitions for the match, if not already created
-            Gamecards.init(tournamentMatch);
         }
         else {
             ModerationModule.ModeratedMatchLookup[matchId].push(tournamentMatch);
             hookedMatch = _.find(ModerationModule.ModeratedTmatchLookup, { 'id': matchId });
             log.info(`[Moderation] Found match with ID [${tmatchId}] ([${matchId}]). Hooking on it.`);
         }
+        // Initiate gamecards logic, if not already, and create card definitions for the match, if not already created
+        Gamecards.init(tournamentMatch);
+
         ModerationModule.ModeratedTmatchLookup[tmatchId] = hookedMatch;
 
         return hookedMatch;
