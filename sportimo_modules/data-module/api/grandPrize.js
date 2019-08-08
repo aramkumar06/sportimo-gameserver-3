@@ -96,6 +96,7 @@ router.put('/v1/data/grand-prizes/:prizeId', (req, res) => {
             prize.client = prizeToUpdate.client;
             prize.titleText = prizeToUpdate.titleText;
             prize.infoText = prizeToUpdate.infoText;
+            prize.detailText = prizeToUpdate.detailText;
             prize.promoImage = prizeToUpdate.promoImage;
             prize.promoDetailImage = prizeToUpdate.promoDetailImage;
             prize.startFromDate = prizeToUpdate.startFromDate;
@@ -183,8 +184,10 @@ const ValidateGrandPrize = function (prize) {
     if (!prize.titleText)
         return { success: false, error: 'Invalid title' };
 
-    if (!prize.startFromDate || _.isDate(prize.startFromDate))
+    if (!prize.startFromDate || !_.isDate(prize.startFromDate))
         return { success: false, error: 'Invalid startFrom date' };
+    if (!prize.endToDate || !_.isDate(prize.endToDate))
+        return { success: false, error: 'Invalid endTo date' };
 
     // Otherwise
     return { success: true, error: null };

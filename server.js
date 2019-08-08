@@ -263,8 +263,38 @@ function log(info) {
     //  console.log("[" + Date.now() + "] API CALL: " + info);
 }
 
-app.use(bodyParser.json());
+
+// See below how the payload limit is set for bodyParser:
+// https://stackoverflow.com/questions/19917401/error-request-entity-too-large
+
+
+// See why we have to manually instruct body parser to serialize to dates from string: https://github.com/expressjs/body-parser/issues/17
+
+var regexIso8601 = /^(\d{4}|\+\d{6})(?:-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})\.(\d{1,})(Z|([\-+])(\d{2}):(\d{2}))?)?)?)?$/;
+
+function reviveDates(key, value) {
+    var match;
+    if (typeof value === "string" && (match = value.match(regexIso8601))) {
+        var milliseconds = Date.parse(match[0]);
+        if (!isNaN(milliseconds)) {
+            return new Date(milliseconds);
+        }
+    }
+    return value;
+}
+
+
+//app.use(bodyParser.json());
+app.use(bodyParser.json({
+    limit: '10mb',
+    reviver: reviveDates
+}));
+app.use(bodyParser.text({
+    limit: '10mb',
+    type: 'text/*'
+}));
 app.use(bodyParser.urlencoded({
+    limit: '10mb',
     extended: true
 }));
 
