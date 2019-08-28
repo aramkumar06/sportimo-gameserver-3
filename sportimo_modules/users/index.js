@@ -15,11 +15,12 @@ var config = require('./config'), // get our config file
     User = mongoose.models.users, // get our mongoose model
     ObjectId = mongoose.Types.ObjectId,
     Message = require('../models/message'), // get our mongoose model
-    UserActivities = mongoose.models.trn_user_activities, // get our mongoose model
-    Scores = mongoose.models.trn_scores,
-    Achievements = mongoose.models.achievements,
-    Subscriptions = mongoose.models.trn_subscriptions,
+    UserActivities = require('../models/trn_user_activity'), // get our mongoose model
+    Scores = mongoose.models.scores,
+    Achievements = require('../models/achievement'),
+    Subscriptions = require('../models/trn_subscription'),
     CryptoJS = require("crypto-js");
+
 var logger = require('winston');
 var _ = require('lodash');
 var async = require('async');
