@@ -5,50 +5,6 @@ var express = require('express'),
     logger = require('winston');
 
 
-router.post('/v1/data/matches/:id/leaderboard', (req, res) => {
-
-    var id = req.params.id;
-
-    return entity.addLeaderboardDef(req.query.client, id, req.body, function (err, data) {
-        if (!err) {
-            return res.status(200).json(data);
-        } else {
-            logger.log('error', err.stack, req.body);
-            return res.status(500).json(err);
-        }
-    });
-});
-
-
-router.put('/v1/data/matches/:id/leaderboard', (req, res) => {
-
-    var id = req.params.id;
-
-    return entity.editLeaderboardDef(req.query.client, id, req.body, function (err, data) {
-        if (!err) {
-            return res.status(200).json(data);
-        } else {
-            logger.log('error', err.stack, req.body);
-            return res.status(500).json(err);
-        }
-    });
-});
-
-
-router.delete('/v1/data/matches/:id/leaderboard', (req, res) => {
-
-    var id = req.params.id;
-
-    return entity.deleteLeaderboardDef(req.query.client, id, function (err, data) {
-        if (!err) {
-            return res.status(200).json(data);
-        } else {
-            logger.log('error', err.stack, req.body);
-            return res.status(500).json(err);
-        }
-    });
-});
-
 
 
 router.get('/v1/data/matches', (req, res) => {
@@ -141,6 +97,52 @@ router.delete('/v1/data/matches/:id', (req, res) => {
     return entity.delete(req.query.tournament, id, function (err, data) {
         if (!err) {
             return res.status(204).send();
+        } else {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        }
+    });
+});
+
+
+
+router.post('/v1/data/matches/:id/leaderboard', (req, res) => {
+
+    var id = req.params.id;
+
+    return entity.addLeaderboardDef(req.query.client, id, req.body, function (err, data) {
+        if (!err) {
+            return res.status(200).json(data);
+        } else {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        }
+    });
+});
+
+
+router.put('/v1/data/matches/:id/leaderboard', (req, res) => {
+
+    var id = req.params.id;
+
+    return entity.editLeaderboardDef(req.query.client, id, req.body, function (err, data) {
+        if (!err) {
+            return res.status(200).json(data);
+        } else {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        }
+    });
+});
+
+
+router.delete('/v1/data/matches/:id/leaderboard', (req, res) => {
+
+    var id = req.params.id;
+
+    return entity.deleteLeaderboardDef(req.query.client, id, function (err, data) {
+        if (!err) {
+            return res.status(200).json(data);
         } else {
             logger.log('error', err.stack, req.body);
             return res.status(500).json(err);

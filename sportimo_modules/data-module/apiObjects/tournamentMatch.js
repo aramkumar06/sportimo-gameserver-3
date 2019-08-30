@@ -348,7 +348,7 @@ api.delete = function (tournamentId, id, cb) {
 api.addLeaderboardDef = function (clientId, id, entity, cb) {
 
     if (entity === undefined) {
-        cb(new Error('No entity provided. Please provide valid data to update.'));
+        return cb(new Error('No entity provided. Please provide valid data to update.'));
     }
 
     entity = new LeaderboardDef(entity);
@@ -368,8 +368,8 @@ api.addLeaderboardDef = function (clientId, id, entity, cb) {
 
 api.editLeaderboardDef = function (clientId, id, updateData, cb) {
 
-    if (entity === undefined) {
-        cb(new Error('No entity provided. Please provide valid data to update.'));
+    if (!updateData || !updateData._id) {
+        return cb(new Error('No entity provided. Please provide valid data to update.'));
     }
 
     return LeaderboardDef.findOneAndUpdate({ _id: updateData._id, client: clientId },
