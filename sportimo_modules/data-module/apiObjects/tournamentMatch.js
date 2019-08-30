@@ -8,7 +8,10 @@ var mongoose = require('mongoose'),
     async = require('async'),
     Entity = mongoose.models.trn_matches,
     Match = mongoose.models.matches,
+    Clients = require('../../models/trn_client'),
     EmptyMatch = require('../config/empty-match'),
+    ClientDefaultSettings = require('../config/client-default-settings'),
+    LeaderboardDef = require('../../models/trn_leaderboard_def'),
     api = {};
 
 
@@ -120,11 +123,23 @@ api.add = function (entity, cb) {
     const simulationMatch = entity.moderation && _.some(entity.moderation, m => m.simulatedfeed);
 
     let leaderboardTemplate = null;
+    let client = null;
 
     async.waterfall([
-        (cbk) => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }).limit(1).exec(cbk),
-        (templates, cbk) => {
+        cbk => async.parallel([
+                icbk => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }).limit(1).exec(icbk),
+                icbk => Clients.findById(entity.client, 'settings', icbk)
+            ], cbk),
+        (parallelResults, cbk) => {
             // Try finding the referrenced match, if existing already in the matches collection, that is not completed
+            const templates = parallelResults[0];
+            client = parallelResults[1];
+
+            if (!client) {
+                const err = new Error(`Invalid client id ${entity.client}`);
+                err.statusCode = 400;
+                return cbk(err);
+            }
 
             const matchQuery = {
                 completed: { $ne: true }
@@ -175,6 +190,17 @@ api.add = function (entity, cb) {
                 entity.match = savedMatch;
 
             const tMatch = new Entity(entity);
+
+            // Set tMatch settings from client settings, if not there, from default settings
+            tMatch.settings = {
+                sendPushes: ClientDefaultSettings.sendPushes,
+                gameCards: ClientDefaultSettings.gameCards
+            };
+            if (client.settings && client.settings.gameCards)
+                tMatch.settings.gameCards = client.settings.gameCards;
+            if (client.settings && client.settings.sendPushes)
+                tMatch.settings.sendPushes = client.settings.sendPushes;
+            tMatch.markModified('settings');
 
             if (leaderboardTemplate) {
                 // Create a leaderboardDefinition as well
@@ -316,6 +342,59 @@ api.delete = function (tournamentId, id, cb) {
 
     });
 
+};
+
+
+api.addLeaderboardDef = function (clientId, id, entity, cb) {
+
+    if (entity === undefined) {
+        cb(new Error('No entity provided. Please provide valid data to update.'));
+    }
+
+    entity = new LeaderboardDef(entity);
+    entity.client = clientId;
+
+    async.waterfall([
+        cbk => entity.save(cbk),
+        (savedDef, cbk) => Entity
+            .findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: savedDef.id } }, { new: true })
+            .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+            .exec(cbk)
+    ], function (err, updatedEntity) {
+        cbf(cb, err, updatedEntity.toObject());
+    });
+
+};
+
+api.editLeaderboardDef = function (clientId, id, updateData, cb) {
+
+    if (entity === undefined) {
+        cb(new Error('No entity provided. Please provide valid data to update.'));
+    }
+
+    return LeaderboardDef.findOneAndUpdate({ _id: updateData._id, client: clientId },
+        {
+            $set: {
+                title: updateData.title,
+                info: updateData.info,
+                active: updateData.active,
+                country: updateData.country,
+                besstcores: updateData.bestscores,
+                prizes: updateData.prizes
+            }
+        },
+        { new: true },
+        cb);
+};
+
+api.deleteLeaderboardDef = function (clientId, id, cb) {
+
+    async.waterfall([
+        cbk => Entity.findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: null } }, { new: true }, cbk),
+        (updated, cbk) => LeaderboardDef.remove({ _id: updated.leaderboardDefinition }, cbk)
+    ], (err) => {
+        return cbf(cb, err, true);
+    });
 };
 
 
