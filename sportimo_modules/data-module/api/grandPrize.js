@@ -104,6 +104,7 @@ router.put('/v1/data/grand-prizes/:prizeId', (req, res) => {
             prize.active = prizeToUpdate.active;
             prize.bestscores = prizeToUpdate.bestscores;
             prize.prizes = prizeToUpdate.prizes;
+            prize.isMajor = prizeToUpdate.isMajor;
 
             prize.save(cbk);
         }
