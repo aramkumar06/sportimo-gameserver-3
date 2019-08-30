@@ -2006,6 +2006,7 @@ apiRoutes.get('/v1/users/:uid/block/:buid/:state', function (req, res) {
 // @@ 
 // @@   User Subscriptions
 
+/*
 //Get user subscription
 apiRoutes.get('/v1/users/:id/subscription', function (req, res) {
 
@@ -2031,7 +2032,39 @@ apiRoutes.post('/v1/users/:id/subscription', function (req, res) {
             res.status(500).send(err);
     })
 });
+*/
 
+apiRoutes.post('/v1/users/subscription', (req, res) => {
+
+    const body = req.body;
+
+    if (!body.msisdn || !body.date)
+        return res.stsatus(400).json({ error: 'invalid or missing request body parameters', errorCode: 1001 });
+
+    async.waterfall([
+        cbk => User.find({ msisdn: body.msisdn }, cbk),
+        (user, cbk) => {
+            if (!user) {
+                const err = new Error('msisdn not found');
+                err.errorCode = 1002;
+                err.statusCode = 404;
+                err.json = { errorCode: err.errorCode, error: err.message, success: false };
+                return cbk(err);
+            }
+
+            user.subscriptionEnd = body.date;
+
+            // ToDo: create a user event regarding the subscription, with the subscription body, headers, host
+
+            user.save(cbk);
+        }
+    ], (err, result) => {
+        if (err)
+            return res.status(err.errorCode || 500).json(err.json || { success: false });
+
+        return res.status(200).json({ success: true });
+    });
+});
 
 
 

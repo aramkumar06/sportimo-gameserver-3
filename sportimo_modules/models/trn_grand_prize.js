@@ -19,6 +19,8 @@ else {
         infoText: { type: Schema.Types.Mixed },
         detailText: { type: Schema.Types.Mixed },
 
+        isMajor: { type: Boolean, default: false },
+
         promoImage: { type: String },
         promoDetailImage: { type: String },
 
