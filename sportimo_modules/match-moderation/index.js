@@ -558,8 +558,9 @@ ModerationModule.updateMatchcronJobsInfo = function () {
                     const matchIsReplayed = _.some(match.moderation, i => !!i.simulatedfeed);
                     const expectedScheduledStartTime = match.start.getTime() - 30000;
                     if (matchIsReplayed && (expectedScheduledStartTime !== job.nextInvocation().getTime())) {
-                        log.info(`Match ${matchInMemory ? matchInMemory.name + ' (' + match.id + ')' : match.id} is detected for starting on user demand. Reschedulling start time to ${expectedScheduledStartTime}`);
-                        job.reschedule(expectedScheduledStartTime); //job.name, match.start, job.callback);
+                        const expectedScheduledStartTimeDate = new Date(expectedScheduledStartTime);
+                        log.info(`Match ${matchInMemory ? matchInMemory.name + ' (' + match.id + ')' : match.id} is detected for starting on user demand. Reschedulling start time to ${expectedScheduledStartTimeDate}`);
+                        job.reschedule(expectedScheduledStartTimeDate); //job.name, match.start, job.callback);
                         matchIsUpdated = true;
                     }
 
