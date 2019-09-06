@@ -93,10 +93,13 @@ module.exports = function (ModerationModule) {
                 if (!err)
                     result.tournamentMatch = _.find(tMatches, m => m._id.toHexString() === req.params.id);
 
-                delete result.services;
-                delete result.Timers;
+                var strippedMatch = _.cloneDeep(result);
+                if (strippedMatch.Timers)
+                    delete strippedMatch.Timers;
+                if (strippedMatch.services)
+                    delete strippedMatch.services;
 
-                return res.json(result);
+                return res.json(strippedMatch);
             });
         });
     });
