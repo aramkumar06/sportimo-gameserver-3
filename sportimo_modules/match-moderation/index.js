@@ -547,6 +547,12 @@ ModerationModule.updateMatchcronJobsInfo = function () {
 
             jobs.forEach(job => {
                 if (job && job.nextInvocation()) {
+                    // Check that the match start time minus 5 minutes is the same as the job's scheduled start time.
+                    const matchIsReplayed = _.some(match.moderation, i => !!i.simulatedfeed);
+                    const expectedScheduledStartTime = match.start.getTime() - 30000;
+                    if (matchIsReplayed && (expectedScheduledStartTime !== job.nextInvocation().getTime()))
+                        job.reschedule(expectedScheduledStartTime); //job.name, match.start, job.callback);
+
                     var duration = moment.duration(moment(job.nextInvocation()).diff(itsNow));
                     var durationAsHours = duration.asMinutes();
                     if (match.moderation[0].active) {
