@@ -623,7 +623,7 @@ Parser.prototype.init = function (cbk) {
             else {
                 if (that.isFeedReplay) {
 
-                    that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, scheduleDate, function () {
+                    that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, scheduleDate.getTime() - 30000, function () {
                         log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
                     });
