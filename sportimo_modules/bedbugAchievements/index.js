@@ -123,7 +123,7 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
                                 else {
                                     if (leaderIndex === 0 && leader.score > 0) {
                                         //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                        top1s.push(user.user_id.toString());
+                                        top1s.push(leader.user_id.toString());
                                     }
                                     if (leaderIndex > 0 && leaderIndex < 10 && leader.score > 0) {
                                         //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
@@ -162,8 +162,8 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
                                         // Send push notification to users with their rank and score.
                                         if (!trnMatch.isHidden && !match.disabled) {
                                             if (pushNotifications && pushNotifications.G6) {
-                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G6 notification to user: ${user.user_id}`);
-                                                MessagingTools.sendPushToUsers([user.user_id], msgG6, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
+                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G6 notification to user: ${leader.user_id}`);
+                                                MessagingTools.sendPushToUsers([leader.user_id], msgG6, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
                                             }
                                         }
                                     }
