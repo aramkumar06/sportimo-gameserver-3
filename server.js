@@ -212,7 +212,10 @@ try {
     // if (mongoose.connection.readyState != 1 && mongoose.connection.readyState != 2)
     mongoose.Promise = global.Promise;
 
-    mongoose.connect(mongoConnection, function (err, res) {
+    mongoose.connect(mongoConnection, {
+        useNewUrlParser: true,
+        useFindAndModify: false
+    }, function (err, res) {
         if (err) {
             console.error('ERROR connecting to: ' + mongoConnection + '. ' + err);
             process.exit(1);
