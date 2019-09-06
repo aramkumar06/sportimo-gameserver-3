@@ -477,8 +477,8 @@ Parser.prototype.init = function (cbk) {
     // Execute multiple async functions in parallel getting the player ids and parserids mapping
     async.parallel([
         function (callback) {
-            if (that.simulated)
-                return callback(null);
+            if (that.isSimulated)
+                return async.nextTick(callback);
 
             BookMatch(that.matchParserId, (bookErr, bookResult) => {
                 if (!bookErr)
@@ -503,10 +503,14 @@ Parser.prototype.init = function (cbk) {
             });
         },
         function (callback) {
+            if (that.isFeedReplay)
+                return async.nextTick(callback);
+
             // Get the state of the match, and accordingly try to schedule the timers for receiving the match events
             GetEventStatus(that.matchParserId, (statusErr, eventStatus, matchPostponed) => {
-                if (statusErr)
+                if (statusErr) {
                     return callback(statusErr);
+                }
 
                 isActive = eventStatus;
                 if (matchPostponed)
@@ -619,7 +623,7 @@ Parser.prototype.init = function (cbk) {
             else {
                 if (that.isFeedReplay) {
 
-                    that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
+                    that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, scheduleDate, function () {
                         log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
                     });
@@ -637,6 +641,32 @@ Parser.prototype.init = function (cbk) {
     });
 };
 
+
+// A function in order to start on demand a match after the first user has explicitly opted to.
+Parser.prototype.StartReplayableMatch = function () {
+
+    const that = this;
+    const scheduleDate = that.matchHandler.start;
+    let formattedScheduleDate = moment.utc(scheduleDate);
+    formattedScheduleDate.subtract(30, 'seconds');
+
+    log.info(`[Statscore on ${that.matchHandler.name}]: Scheduled Date is ${formattedScheduleDate.toDate()}`);
+
+    if (that.isFeedReplay) {
+
+        if (that.scheduledTask)
+            that.scheduledTask.cancel();
+
+        that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, formattedScheduleDate.toDate(), function () {
+            log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
+            that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
+        });
+        if (!that.scheduledTask) {
+            log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
+            that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
+        }
+    }
+};
 
 
 

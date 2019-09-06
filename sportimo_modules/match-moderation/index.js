@@ -545,13 +545,26 @@ ModerationModule.updateMatchcronJobsInfo = function () {
             const jobs = _.filter(scheduler.scheduledJobs, { name: match.id });
             const matchInMemory = ModerationModule.GetTournamentMatch(trnMatch.id);
 
+            // Determine what half of the minute this is. If it's the first one, then only check for jobs to update.
+            const isFirstMinuteHalf = itsNow.second() < 30;
+            let matchIsUpdated = false;
+
+            if (!jobs || jobs.length === 0)
+                return async.nextTick(cbk);
+
             jobs.forEach(job => {
                 if (job && job.nextInvocation()) {
                     // Check that the match start time minus 5 minutes is the same as the job's scheduled start time.
                     const matchIsReplayed = _.some(match.moderation, i => !!i.simulatedfeed);
                     const expectedScheduledStartTime = match.start.getTime() - 30000;
-                    if (matchIsReplayed && (expectedScheduledStartTime !== job.nextInvocation().getTime()))
+                    if (matchIsReplayed && (expectedScheduledStartTime !== job.nextInvocation().getTime())) {
+                        log.info(`Match ${matchInMemory ? matchInMemory.name + ' (' + match.id + ')' : match.id} is detected for starting on user demand. Reschedulling start time to ${expectedScheduledStartTime}`);
                         job.reschedule(expectedScheduledStartTime); //job.name, match.start, job.callback);
+                        matchIsUpdated = true;
+                    }
+
+                    if (isFirstMinuteHalf)
+                        return;
 
                     var duration = moment.duration(moment(job.nextInvocation()).diff(itsNow));
                     var durationAsHours = duration.asMinutes();
@@ -563,8 +576,12 @@ ModerationModule.updateMatchcronJobsInfo = function () {
                         match.moderation[1].start = "in " + durationAsHours.toFixed(2) + " minutes";
                         match.moderation[1].scheduled = true;
                     }
+                    matchIsUpdated = true;
                     log.info(`Match tick for ${matchInMemory ? matchInMemory.name + ' (' + match.id + ')' : match.id} will start in ${durationAsHours.toFixed(2)} minutes`);
                 } else {
+                    if (isFirstMinuteHalf)
+                        return;
+
                     // log.info("Match has not been picked up from scheduler");
                     match.moderation[0].start = "";
                     match.moderation[0].scheduled = false;
@@ -574,6 +591,10 @@ ModerationModule.updateMatchcronJobsInfo = function () {
                     }
                 }
             });
+
+            if (!matchIsUpdated)
+                return async.nextTick(cbk);
+
             match.save(function (er, re) {
                 if (er)
                     return cbk(null);
@@ -592,9 +613,7 @@ ModerationModule.updateMatchcronJobsInfo = function () {
                 log.error(`[ModerationModule] Error while updating match schedules in updateMatchcronJobsInfo: ${asyncErr.stack}`);
         });
     });
-
-
-}
+};
 
 
 ModerationModule.matchStartWatcher = function () {
@@ -681,7 +700,7 @@ function initModule(callback) {
     });
 
     // Here we will create a job in interval where we check for feed matches, if theit timers are set and update accordingly the time until initiation
-    ModerationModule.cronJobsUpdateInterval = setInterval(ModerationModule.updateMatchcronJobsInfo, 60000);
+    ModerationModule.cronJobsUpdateInterval = setInterval(ModerationModule.updateMatchcronJobsInfo, 30000);
 
     // Here we create a job executed in 5min intervals, that will send the notifications: 
     // The match is about to start 15 mins before the start, and 2 reactivation motivations 5 mins before the start
