@@ -91,7 +91,7 @@ var localConfiguration = process.env.NODE_ENV == "production" ? statscoreConfigP
 
 const DetectCooldown = function (isLongCooldown, isMatchSimulated) {
 
-    if (isMatchSimulated) {
+    if (!isMatchSimulated) {
         if (isLongCooldown)
             return 90;
         else
@@ -103,7 +103,7 @@ const DetectCooldown = function (isLongCooldown, isMatchSimulated) {
         else
             return 3;
     }
-}
+};
 
 // Settings properties
 
@@ -643,6 +643,7 @@ Parser.prototype.init = function (cbk) {
 
 
 // A function in order to start on demand a match after the first user has explicitly opted to.
+/*
 Parser.prototype.StartReplayableMatch = function () {
 
     const that = this;
@@ -667,7 +668,7 @@ Parser.prototype.StartReplayableMatch = function () {
         }
     }
 };
-
+*/
 
 
 Parser.prototype.StartQueueReplayer = function (matchParserId, matchParserEventIds) {
@@ -743,6 +744,13 @@ Parser.prototype.StartMatchFeedReplayer = function (matchParserId, matchParserEv
                 }, 800);
             else
                 cbk(null);
+        }, (err) => {
+            // Make sure that the parser terminates at the end
+            if (!that.status.isTerminated)
+                setTimeout(() => {
+                    // Send an event that the match is ended.
+                    that.feedService.EndOfMatch();
+                }, 5000);
         });
 
         return callback ? callback(null) : null;
