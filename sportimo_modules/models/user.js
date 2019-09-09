@@ -2,6 +2,7 @@
 var mongoose = require('mongoose'),
     bcrypt = require("bcryptjs"),
     moment = require('moment'),
+    _ = require('lodash'),
     Schema = mongoose.Schema;
 
 var userStats = new Schema({
@@ -15,7 +16,7 @@ var userStats = new Schema({
     instantCardsWon: { type: Number, default: 0 },
     overallCardsPlayed: { type: Number, default: 0 },
     overallCardsWon: { type: Number, default: 0 }
-})
+});
 
 
 var achievement = new Schema({

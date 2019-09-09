@@ -68,6 +68,7 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
     async.waterfall([
         (cbk) => {
             return mongoose.models.trn_matches.find({ match: matchid })
+                .populate({ path: 'client', select: 'settings' })
                 .populate({ path: 'tournament', match: { state: 'active' } })
                 .populate('leaderboardDefinition')
                 .populate({ path: 'match', select: '-stats -timeline', populate: [{ path: 'home_team', select: 'name' }, { path: 'away_team', select: 'name' }] })
@@ -82,6 +83,7 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
             async.each(eligibleTrnMatches, (trnMatch, trnCbk) => {
 
                 const match = trnMatch.match;
+                const pushNotifications = trnMatch.client.settings ? trnMatch.client.settings.pushNotifications : null;
 
                 // Determine the match name
                 let matchName = { en: '', ar: '' };
@@ -123,19 +125,19 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
                                 else {
                                     if (leaderIndex === 0 && leader.score > 0) {
                                         //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                        top1s.push(leader.user_id.toString());
+                                        top1s.push(leader._id);
                                     }
                                     if (leaderIndex > 0 && leaderIndex < 10 && leader.score > 0) {
                                         //MessagingTools.sendPushToUsers(user.user_id, { en: `Congratulation!\n You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                        top10s.push(leader.user_id.toString());
+                                        top10s.push(leader._id);
                                     }
                                     if (leaderIndex >= 10 && leaderIndex < 100 && leader.score > 0) {
                                         //MessagingTools.sendPushToUsers(user.user_id, { en: `You ranked #${leaderIndex + 1} and won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                        top100s.push(leader.user_id.toString());
+                                        top100s.push(leader._id);
                                     }
                                     if (leaderIndex >= 100 && leader.score > 0) {
                                         //MessagingTools.sendPushToUsers(user.user_id, { en: `You won ${user.score} points` }, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "all");
-                                        loosers.push(leader.user_id.toString());
+                                        loosers.push(leader._id);
                                     }
 
                                     if (leaderIndex >= 0 && leaderIndex < 3 && leader.score > 0) {
@@ -148,8 +150,8 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
                                         // Send push notification to users with their rank and score.
                                         if (!trnMatch.isHidden && !match.disabled) {
                                             if (pushNotifications && pushNotifications.G5) {
-                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G5 notification to user: ${leader.user_id}`);
-                                                MessagingTools.sendPushToUsers([leader.user_id], msgG5, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
+                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G5 notification to user: ${leader._id}`);
+                                                MessagingTools.sendPushToUsers([leader._id], msgG5, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
                                             }
                                         }
                                     }
@@ -162,8 +164,8 @@ Handler.Reward.rank_achievements = function (matchid, outerCallback) {
                                         // Send push notification to users with their rank and score.
                                         if (!trnMatch.isHidden && !match.disabled) {
                                             if (pushNotifications && pushNotifications.G6) {
-                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G6 notification to user: ${leader.user_id}`);
-                                                MessagingTools.sendPushToUsers([leader.user_id], msgG6, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
+                                                logger.log('info', `[${matchName.en}]: Sending leaderboard G6 notification to user: ${leader._id}`);
+                                                MessagingTools.sendPushToUsers([leader._id], msgG6, { "type": "view", "data": { "view": "match", "viewdata": matchid } }, "final_result");
                                             }
                                         }
                                     }
