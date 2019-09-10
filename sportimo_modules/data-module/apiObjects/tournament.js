@@ -4,7 +4,7 @@
 const mongoose = require('mongoose'),
     moment = require('moment'),
     ObjectId = mongoose.Types.ObjectId,
-    Entity = mongoose.models.tournaments,
+    Entity = require('../../models/tournament'),
     LeaderboardDef = mongoose.models.trn_leaderboard_defs,
     async = require('async'),
     _ = require('lodash'),
@@ -188,6 +188,78 @@ api.deleteLeaderboardDef = function (clientId, id, cb) {
 };
 
 
+/*
+========= [ CACHE REGENERATION METHODS ] =========
+*/
+
+api.regenerateTournamentCache = function (cb) {
+
+    const Clients = require('../../models/trn_client');
+    const Scores = require('../../models/trn_score');
+    const Tournaments = Entity;
+    const TournamentMatch = require('../../models/trn_match');
+    let clients = [];
+    let tournaments = [];
+
+    async.waterfall([
+        cbk => Clients.find({}, cbk),
+        (allClients, cbk) => {
+
+            clients = allClients;
+            const clientIds = _.map(clients, c => c._id);
+
+            return Tournaments.find({ client: { $in: clientIds }, state: { $ne: 'deleted' } }, cbk);
+        },
+        (allTournaments, cbk) => {
+
+            tournaments = allTournaments;
+            const tournamentIds = _.map(tournaments, t => t._id);
+
+            //cbk => TournamentMatch.count({ tournament: id, isHidden: { $ne: true } }, cbk),
+            //cbk => Scores.count({ tournament: id }, cbk),
+            async.parallel([
+                icbk => TournamentMatch.aggregate([
+                    { $match: { tournament: { $in: tournamentIds }, isHidden: { $ne: true } } },
+                    {
+                        $group: {
+                            _id: '$tournament',
+                            //id: { $toString: '$tournament' },
+                            count: { $sum: 1 }
+                        }
+                    }
+                ], icbk),
+                icbk => Scores.aggregate([
+                    { $match: { tournament: { $in: tournamentIds } } },
+                    {
+                        $group: {
+                            _id: '$tournament',
+                            //id: { $toString: '$tournament' },
+                            count: { $sum: 1 }
+                        }
+                    }
+                ], icbk)
+            ], cbk);
+        }
+    ], (err, results) => {
+        const allMatches = results[0] || {};
+        const allParticipations = results[1] || {};
+
+        _.forEach(tournaments, t => {
+
+            const foundInMatches = _.find(allMatches, m => m._id.toHexString() === t.id);
+            if (foundInMatches)
+                t.matches = foundInMatches.count;
+
+            const foundInParticipations = _.find(allParticipations, p => p._id.toHexString() === t.id);
+            if (foundInParticipations)
+                t.participations = foundInParticipations.count;
+        });
+
+        return async.eachLimit(tournaments, 100,
+            (t, cbk) => t.save(cbk),
+            cb);
+    });
+};
 
 /*
 ========= [ UTILITY METHODS ] =========

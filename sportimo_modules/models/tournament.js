@@ -28,6 +28,10 @@ else {
         //subscriptionPolicy: { type: String, enum: ['free', 'goldTickets'] },
         leaderboardDefinition: { type: ObjectId, ref: 'trn_leaderboard_defs' },
         settings: { type: Schema.Types.Mixed },
+        // Cached numeric Properties
+        matches: { type: Number, default: 0 },  // tournament matches under the tournament
+        participations: { type: Number, default: 0 },   // number of user participations (having played at least 1 card) in tournament matches
+        // Audit properties (timestamps)
         created: { type: Date, default: Date.now },
         updated: { type: Date, default: Date.now }
     };
