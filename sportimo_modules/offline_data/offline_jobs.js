@@ -12,12 +12,12 @@ try {
     //const competitionId = "56f4800fe4b02f2226646297";	// Premier League
     //var competitionId = "577ec1011916317238fd2f33";	// Germany Bundesliga
     //var competitionId = "577ec1381916317238fd2f34";	// Italy serie A
-    //var competitionId = "577ec1a61916317238fd2f36";	// Spain Liga Primera
+    var competitionId = "577ec1a61916317238fd2f36";	// Spain Liga Primera
     //var competitionId = "580b8731971f4ca44b4f63e8";	// Saudi Professional League
     //var competitionId = "588a71ec971f4ca44b4f67e0";	// UAE Arabian Gulf League
     //var competitionId = "588a7345971f4ca44b4f67e1";	// Egypt Premier League
     //var competitionId = "577ec2f71916317238fd2f39";	// Champions League
-    var competitionId = "577ec33d1916317238fd2f3a";	// Europa League -- needs Statscore update for 2018-2019
+    //var competitionId = "577ec33d1916317238fd2f3a";	// Europa League -- needs Statscore update for 2018-2019
     //var competitionId = "5aaf6a958b3e30b41dab995f";	// France League 1
     //var competitionId = "577ec22b1916317238fd2f37";	// World Cup 2018
     //var competitionId = "5b4c63370807967e35f780e1";	// Africa CAF Champions League
@@ -33,6 +33,7 @@ try {
     //var competitionId = "5b8f80468b3e30b41dacd016";	// UEFA Nations League
     //var competitionId = "5bbd9d4ac7cc110d8f3979e8";	// International Friendlies
     //const competitionId = "5cfe25954e8dece82fc3636c";	// Copa America 2019
+    //var competitionId = "5c8d5a2f008fbffc2cb12a10";	// Euro Qualifying Rounds
 
 
     let seasonId = null; // default season, get the latest one for the given competition id
@@ -58,7 +59,7 @@ try {
 
             const statscore = require('./parsers/Statscore');
 
-
+            
             if (competitionId) {
                 //statscore.GetPastEventFeed(2436921, (err, result) => {
                 //statscore.UpdateTeamPlayersCareerStats("588a8d890bb50f00feda8dbe", 29362, (err, playersUpdated) => {
@@ -80,6 +81,20 @@ try {
                     process.exit(0);
                 });
             }
+            
+            /*
+            const Achievements = require('../bedbugAchievements');
+            const matchId = "5d75158f1b27c5001f7e678f";
+            Achievements.Reward.rank_achievements(matchId, (error) => {
+                if (error) {
+                    console.error('ERROR computing achievements due to: ' + err);
+                    return process.exit(1);
+                }
+
+                console.log("Operation terminated");
+                process.exit(0);
+            });
+            */
         }
     });
 }
