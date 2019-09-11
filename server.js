@@ -214,7 +214,8 @@ try {
 
     mongoose.connect(mongoConnection, {
         useNewUrlParser: true,
-        useFindAndModify: false
+        useFindAndModify: false,
+        useCreateIndex : true
     }, function (err, res) {
         if (err) {
             console.error('ERROR connecting to: ' + mongoConnection + '. ' + err);
