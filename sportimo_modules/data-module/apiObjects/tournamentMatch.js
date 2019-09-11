@@ -149,21 +149,24 @@ api.add = function (entity, cb) {
             if (templates && templates.length > 0)
                 leaderboardTemplate = templates[0];
 
-            if (!simulationMatch && entity.moderation && entity.moderation.length > 0) {
-                matchQuery.$or = [];
-                entity.moderation.forEach((m) => {
-                    matchQuery.$or.push({
-                        moderation: {
-                            $elemMatch: {
-                                parsername: m.parsername,
-                                parserid: m.parserid
-                            }
-                        }
-                    });
-                });
-            }
+            if (!simulationMatch && entity._id)
+                matchQuery._id = new ObjectId(entity._id);
             else
-                return cbk(null, []);
+                if (!simulationMatch && entity.moderation && entity.moderation.length > 0) {
+                    matchQuery.$or = [];
+                    entity.moderation.forEach((m) => {
+                        matchQuery.$or.push({
+                            moderation: {
+                                $elemMatch: {
+                                    parsername: m.parsername,
+                                    parserid: m.parserid
+                                }
+                            }
+                        });
+                    });
+                }
+                else
+                    return cbk(null, []);
 
             return Match.find(matchQuery, '_id moderation name').limit(1).exec(cbk);
         },
@@ -222,7 +225,7 @@ api.add = function (entity, cb) {
 
             return async.parallel([
                 (icbk) => tMatch.save(icbk),
-                (icbk) => Tournaments.updateOne({ _id: entity.tournament }, { $inc: { matches: 1 } }, icbk),
+                (icbk) => Tournaments.findByIdAndUpdate(entity.tournament, { $inc: { matches: 1 } }, icbk),
                 (icbk) => {
                     if (leaderboardTemplate && tMatch.leaderboardDefinition) {
                         return tMatch.leaderboardDefinition.save(icbk);
