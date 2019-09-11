@@ -196,6 +196,7 @@ api.regenerateTournamentCache = function (cb) {
 
     const Clients = require('../../models/trn_client');
     const Scores = require('../../models/trn_score');
+    const Subscriptions = require('../../models/trn_subscription');
     const Tournaments = Entity;
     const TournamentMatch = require('../../models/trn_match');
     let clients = [];
@@ -228,8 +229,8 @@ api.regenerateTournamentCache = function (cb) {
                         }
                     }
                 ], icbk),
-                icbk => Scores.aggregate([
-                    { $match: { tournament: { $in: tournamentIds } } },
+                icbk => Subscriptions.aggregate([
+                    { $match: { state: 'active', tournament: { $in: tournamentIds } } },
                     {
                         $group: {
                             _id: '$tournament',

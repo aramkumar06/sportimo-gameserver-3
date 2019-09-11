@@ -8,7 +8,7 @@ var mongoose = require('mongoose'),
     async = require('async'),
     Entity = mongoose.models.trn_matches,
     Match = mongoose.models.matches,
-    Scores = require('../../models/trn_score'),
+    Subscriptions = require('../../models/trn_subscription'),
     Tournaments = require('../../models/tournament'),
     Clients = require('../../models/trn_client'),
     EmptyMatch = require('../config/empty-match'),
@@ -325,25 +325,24 @@ api.delete = function (tournamentId, id, cb) {
     async.waterfall([
         (cbk) => {
             async.parallel([
-                (icbk) => Scores.count({ tournament: tournamentId, tournamentMatch: id }, icbk),
+                //(icbk) => Subscriptions.count({ tournament: tournamentId, tournamentMatch: id }, icbk),
                 (icbk) => Entity.findOneAndRemove({ _id: id, tournament: tournamentId }, icbk)
             ], cbk);
         },
         // Decrease matches and participations from tournament
         (results, cbk) => {
-            if (!results[1]) {
+            if (!results[0]) {
                 const err = new Error('Match to delete is not found');
                 err.statusCode = 404;
                 return cbk(err);
             }
 
-            tournamentMatch = results[1];
+            tournamentMatch = results[0];
             matchId = tournamentMatch.match.toHexString();
             clientId = tournamentMatch.client;
-            const participations = results[0] || 0;
 
-            if (tournamentMatch && !tournamentMatch.isHidden && participations) {
-                Tournaments.updateOne({ _id: new ObjectId(tournamentId) }, { $inc: { matches: -1, participations: -participations } }, cbk);
+            if (tournamentMatch && !tournamentMatch.isHidden) {
+                Tournaments.updateOne({ _id: new ObjectId(tournamentId), matches: {$gt: 0} }, { $inc: { matches: -1 } }, cbk);
             }
             else
                 async.nextTick(() => cbk(null, null));
