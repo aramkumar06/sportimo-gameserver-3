@@ -8,6 +8,8 @@ var mongoose = require('mongoose'),
     async = require('async'),
     Entity = mongoose.models.trn_matches,
     Match = mongoose.models.matches,
+    Scores = require('../../models/trn_score'),
+    Tournaments = require('../../models/tournament'),
     Clients = require('../../models/trn_client'),
     EmptyMatch = require('../config/empty-match'),
     ClientDefaultSettings = require('../config/client-default-settings'),
@@ -220,12 +222,13 @@ api.add = function (entity, cb) {
 
             return async.parallel([
                 (icbk) => tMatch.save(icbk),
+                (icbk) => Tournaments.updateOne({ _id: entity.tournament }, { $inc: { matches: 1 } }, icbk),
                 (icbk) => {
                     if (leaderboardTemplate && tMatch.leaderboardDefinition) {
                         return tMatch.leaderboardDefinition.save(icbk);
                     }
                     else
-                        return async.setImmediate(() => icbk(null));
+                        return async.setImmediate(() => icbk(null, null));
                 }],
                 cbk);
         }
@@ -314,21 +317,41 @@ api.delete = function (tournamentId, id, cb) {
 
     let matchId = null;
     let clientId = null;
+    let tournamentMatch = null;
 
     async.waterfall([
-        cbk => Entity.findOneAndRemove({ _id: id, tournament: tournamentId }).exec(cbk),
-        (trnMatch, cbk) => {
-            if (!trnMatch)
-                return cbk(null);
+        (cbk) => {
+            async.parallel([
+                (icbk) => Scores.count({ tournament: tournamentId, tournamentMatch: id }, icbk),
+                (icbk) => Entity.findOneAndRemove({ _id: id, tournament: tournamentId }, icbk)
+            ], cbk);
+        },
+        // Decrease matches and participations from tournament
+        (results, cbk) => {
+            if (!results[1]) {
+                const err = new Error('Match to delete is not found');
+                err.statusCode = 404;
+                return cbk(err);
+            }
 
-            matchId = trnMatch.match.toHexString();
-            clientId = trnMatch.client;
+            tournamentMatch = results[1];
+            matchId = tournamentMatch.match.toHexString();
+            clientId = tournamentMatch.client;
+            const participations = results[0] || 0;
+
+            if (tournamentMatch && !tournamentMatch.isHidden && participations) {
+                Tournaments.updateOne({ _id: new ObjectId(tournamentId) }, { $inc: { matches: -1, participations: -participations } }, cbk);
+            }
+            else
+                async.nextTick(() => cbk(null, null));
+        },
+        (updatedTournament, cbk) => {
             return Entity.find({ match: matchId }, cbk);
         },
         // Try removing the referenced match if it is exclusive to this client
         (otherTrnMatches, cbk) => {
             if (otherTrnMatches && otherTrnMatches.length > 0)
-                return cbk(null);
+                return async.nextTick(cbk);
 
             Match.remove({ _id: matchId, exclusiveClient: clientId }, cbk);
         }
