@@ -444,7 +444,10 @@ function Parser(matchContext, feedServiceContext) {
     }
     this.pendingMessages = [];    // list of messages that await persistence
 
-    if (!this.matchHandler.completed || this.matchHandler.completed == false) {
+    // When demoing multiple matches that are coming from the same original moderation parser id, we don't want to open emmitter consumers on all instances
+    // otherwise the event sent by one will be consumed by all other instances of same original match, even those not set to start at that time
+
+    if (!this.isFeedReplay && (!this.matchHandler.completed || this.matchHandler.completed == false)) {
         // Register to internal socket manager events
         Emitter.on('event', this.ConsumeMessage.bind(this));
     }
@@ -625,10 +628,22 @@ Parser.prototype.init = function (cbk) {
 
                     that.scheduledTask = scheduler.scheduleJob(that.matchHandler.id, scheduleDate.getTime() - 30000, function () {
                         log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
+
+                        if (!that.matchHandler.completed || that.matchHandler.completed === false) {
+                            // Register to internal socket manager events
+                            Emitter.on('event', that.ConsumeMessage.bind(that));
+                        }
+
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
                     });
                     if (!that.scheduledTask) {
                         log.info(`[Statscore on ${that.matchHandler.name}]: Simulated events stream Timer started for matchid ${that.matchHandler.id}`);
+
+                        if (!that.matchHandler.completed || that.matchHandler.completed === false) {
+                            // Register to internal socket manager events
+                            Emitter.on('event', that.ConsumeMessage.bind(that));
+                        }
+
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
                     }
 
