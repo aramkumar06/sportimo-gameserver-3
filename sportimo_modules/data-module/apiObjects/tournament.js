@@ -91,7 +91,7 @@ api.getUnscheduledMatches = function (clientId, tournamentId, cb) {
                 start: { $gt: now },
                 _id: { $nin: tMatchIds }
             })
-            .populate([{ path: 'home_team', select: 'name logo abbr' }, { path: 'away_team', select: 'name logo abbr' }, { path: 'competition', select: 'name logo' }])
+            .populate([{ path: 'home_team', select: 'name shortName logo abbr' }, { path: 'away_team', select: 'name shortName logo abbr' }, { path: 'competition', select: 'name logo' }])
             .select('-timeline -stats')
             .exec(cbk);
         }

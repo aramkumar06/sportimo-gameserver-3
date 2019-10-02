@@ -24,7 +24,7 @@ var mongoose = require('mongoose'),
 // ALL
 api.getAll = function (tournamentId, skip, limit, cb) {
     var q = Entity.find({ tournament: tournamentId });
-    q.populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }]);
+    q.populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name shortName abbr logo' }, { path: 'away_team', select: 'name shortName abbr logo' }] }]);
 
     if (skip !== undefined)
         q.skip(skip * 1);
@@ -53,7 +53,7 @@ api.getById = function (tournamentId, id, cb) {
 
     Entity
         .findOne(query)
-        .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }])
+        .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name shortName abbr logo' }, { path: 'away_team', select: 'name shortName abbr logo' }] }])
         .exec(function (err, entity) {
             if (entity && tournamentId && tournamentId !== entity.tournament)
                 err = new Error(`Conflict between the path-provided tournamentId and tournament's referred tournament id`);
@@ -90,7 +90,7 @@ api.search = function (tournamentId, searchExp, cb) {
                 match: { $in: matchIds }
             };
             Entity.find(query)
-            .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name abbr logo' }, { path: 'away_team', select: 'name abbr logo' }] }])
+                .populate([{ path: 'leaderboardDefinition', populate: 'prizes.prize' }, { path: 'match', populate: [{ path: 'competition', select: 'name logo graphics' }, { path: 'home_team', select: 'name shortName abbr logo' }, { path: 'away_team', select: 'name shortName abbr logo' }] }])
             .exec(cbk);
         }
     ], (parallelErr, results) => {
@@ -152,7 +152,7 @@ api.add = function (entity, cb) {
             if (!simulationMatch && entity._id)
                 matchQuery._id = new ObjectId(entity._id);
             else
-                if (!simulationMatch && entity.moderation && entity.moderation.length > 0) {
+                if (entity.moderation && entity.moderation.length > 0) {
                     matchQuery.$or = [];
                     entity.moderation.forEach((m) => {
                         matchQuery.$or.push({
@@ -165,13 +165,20 @@ api.add = function (entity, cb) {
                         });
                     });
                 }
-                else
-                    return cbk(null, []);
+                //else
+                //    return cbk(null, []);
 
             return Match.find(matchQuery, '_id moderation name').limit(1).exec(cbk);
         },
         (matches, cbk) => {
-            if (matches && matches.length > 0) {
+
+            // Todo: improve validation on start times so that they do not overlapp each other, being at least 2 hours appart.
+            if (simulationMatch && matches && matches.length > 0) {
+                const err = new Error('Cannot add a duplicate replay match while another one based on the same match is upcoming');
+                err.statusCode = 429;
+                return cbk(err);
+            }
+            else if (!simulationMatch && matches && matches.length > 0) {
                 entity.match = matches[0];
 
                 return cbk(null, entity.match);
