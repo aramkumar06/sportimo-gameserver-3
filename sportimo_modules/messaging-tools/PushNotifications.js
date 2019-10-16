@@ -187,8 +187,15 @@ class PushNotifications {
                     const lastFiveMatchesUsers = gamecardResults[2];
                     const lastTenDaysCardUsers = gamecardResults[3];
                     const lastTenDaysMatchVisitors = gamecardResults[4];
+                    let sendPushes = false;
                     const pushNotifications = null;
 
+                    if (trnMatches[0].settings && trnMatches[0].settings.sendPushes !== undefined && trnMatches[0].settings.sendPushes !== null)
+                        sendPushes = trnMatches[0].settings.sendPushes;
+                    else if (trnMatches[0].tournament.settings && trnMatches[0].tournament.settings.sendPushes !== undefined && trnMatches[0].tournament.settings.sendPushes !== null)
+                        sendPushes = trnMatches[0].tournament.settings.sendPushes;
+                    else if (trnMatches[0].client.settings && trnMatches[0].client.settings.sendPushes !== undefined && trnMatches[0].client.settings.sendPushes !== null)
+                        sendPushes = trnMatches[0].client.settings.sendPushes;
                     if (trnMatches[0].settings && trnMatches[0].settings.pushNotifications)
                         pushNotifications = trnMatches[0].settings.pushNotifications;
                     else if (trnMatches[0].client.settings && trnMatches[0].client.settings.pushNotifications)
@@ -247,7 +254,7 @@ class PushNotifications {
                         matchName.ar += matchStartingNext15.away_team.name.ar;
                     else matchName.ar += 'Away team';
 
-                    if (pushNotifications && pushNotifications.R4 && userIdsNotHavingPlayedLastTwentyMatches.length > 0) {
+                    if (sendPushes && pushNotifications && pushNotifications.R4 && userIdsNotHavingPlayedLastTwentyMatches.length > 0) {
                         log.info(`Sending reactivation R4 notification to ${userIdsNotHavingPlayedLastTwentyMatches.length} users: ${_.take(userIdsNotHavingPlayedLastTwentyMatches, 9)}, ...`);
                         const msg = {
                             en: `${matchName.en} kicks off in 15'! Start playing your cards NOW & make it on the leaderboard!`,
@@ -256,7 +263,7 @@ class PushNotifications {
                         };
                         MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastTwentyMatches, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
                     }
-                    if (pushNotifications && pushNotifications.R3 && userIdsNotHavingPlayedLastTenMatches.length > 0) {
+                    if (sendPushes && pushNotifications && pushNotifications.R3 && userIdsNotHavingPlayedLastTenMatches.length > 0) {
                         log.info(`Sending reactivation R3 notification to ${userIdsNotHavingPlayedLastTenMatches.length} users: ${_.take(userIdsNotHavingPlayedLastTenMatches, 9)}, ...`);
                         const msg = {
                             en: `Your name is missing from the leaderboard! Find a match you like and play your cards right 👍`,
@@ -264,7 +271,7 @@ class PushNotifications {
                         };
                         MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastTenMatches, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
                     }
-                    if (pushNotifications && pushNotifications.R2 && userIdsNotHavingPlayedLastFiveMatches.length > 0) {
+                    if (sendPushes && pushNotifications && pushNotifications.R2 && userIdsNotHavingPlayedLastFiveMatches.length > 0) {
                         log.info(`Sending reactivation R2 notification to ${userIdsNotHavingPlayedLastFiveMatches.length} users: ${_.take(userIdsNotHavingPlayedLastFiveMatches, 9)}, ...`);
                         const msg = {
                             en: `Where have you been champ? Join the ${matchName.en} and prove you know your stuff!`,
@@ -272,7 +279,7 @@ class PushNotifications {
                         };
                         MessagingTools.sendPushToUsers(userIdsNotHavingPlayedLastFiveMatches, msg, { "type": "view", "data": { "view": "match", "viewdata": matchId } }, "match_reminder");
                     }
-                    if (pushNotifications && pushNotifications.R1 && userIdsNotHavingPlayedLastTenDays.length > 0) {
+                    if (sendPushes && pushNotifications && pushNotifications.R1 && userIdsNotHavingPlayedLastTenDays.length > 0) {
                         log.info(`Sending reactivation R1 notification to ${userIdsNotHavingPlayedLastTenDays.length} users: ${_.take(userIdsNotHavingPlayedLastTenDays, 9)}, ...`);
                         const msg = {
                             en: `️⚽ ${matchName.en} is starting in 15'! Can you to rank in the top-10? Join the game and see!`,
@@ -316,13 +323,13 @@ class PushNotifications {
 
         const thisMatch = trnMatch.match;
         let pushNotifications = null;
-        let sendPushes = true;
-        if (trnMatch.settings && trnMatch.settings.sendPushes === false)
-            sendPushes = false;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes === false)
-            sendPushes = false;
-        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes === false)
-            sendPushes = false;
+        let sendPushes = false;
+        if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
+            sendPushes = trnMatch.settings.sendPushes;
+        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+            sendPushes = trnMatch.tournament.settings.sendPushes;
+        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
+            sendPushes = trnMatch.client.settings.sendPushes;
 
 
         if (trnMatch.settings && trnMatch.settings.pushNotifications)
@@ -387,11 +394,11 @@ class PushNotifications {
 
                     // Send push notification to users that the game has started.
                     if (!trnMatch.isHidden && !thisMatch.disabled) {
-                        if (pushNotifications && pushNotifications.E2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
+                        if (sendPushes && pushNotifications && pushNotifications.E2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
                             log.info(`[Match module ${thisMatch.name}]: Sending match start E2 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
                             MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgE2, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "kick_off");
                         }
-                        if (pushNotifications && pushNotifications.E1 && userIdsHavingFavoriteTeam && userIdsHavingFavoriteTeam.length > 0) {
+                        if (sendPushes && pushNotifications && pushNotifications.E1 && userIdsHavingFavoriteTeam && userIdsHavingFavoriteTeam.length > 0) {
                             log.info(`[Match module ${thisMatch.name}]: Sending match start E1 notification to users: ${_.take(userIdsHavingFavoriteTeam, 9)}, ...`);
                             MessagingTools.sendPushToUsers(userIdsHavingFavoriteTeam, msgE1, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "kick_off");
                         }
@@ -444,7 +451,7 @@ class PushNotifications {
 
                     // Send push notification to users that the game has started.
                     if (!trnMatch.isHidden && !thisMatch.disabled) {
-                        if (pushNotifications && pushNotifications.G2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
+                        if (sendPushes && pushNotifications && pushNotifications.G2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
                             log.info(`[Match module ${thisMatch.name}]: Sending match half-time G2 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
                             MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgG2, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "kick_off");
                         }
@@ -478,13 +485,13 @@ class PushNotifications {
 
         const thisMatch = trnMatch.match;
         let pushNotifications = null;
-        let sendPushes = true;
-        if (trnMatch.settings && trnMatch.settings.sendPushes === false)
-            sendPushes = false;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes === false)
-            sendPushes = false;
-        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes === false)
-            sendPushes = false;
+        let sendPushes = false;
+        if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
+            sendPushes = trnMatch.settings.sendPushes;
+        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+            sendPushes = trnMatch.tournament.settings.sendPushes;
+        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
+            sendPushes = trnMatch.client.settings.sendPushes;
 
         // Check whether the settings allow for a push, else return
         if (!sendPushes)
@@ -536,7 +543,7 @@ class PushNotifications {
 
                 // Send push notification to users that a goal is kicked.
                 if (!trnMatch.isHidden && !thisMatch.disabled) {
-                    if (pushNotifications && pushNotifications.G1 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
+                    if (sendPushes && pushNotifications && pushNotifications.G1 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
                         log.info(`[Match module ${thisMatch.name}]: Sending match Goal G1 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
                         MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgG1, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "goals");
                     }
@@ -569,13 +576,13 @@ class PushNotifications {
 
         const thisMatch = trnMatch.match;
         let pushNotifications = null;
-        let sendPushes = true;
-        if (trnMatch.settings && trnMatch.settings.sendPushes === false)
-            sendPushes = false;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes === false)
-            sendPushes = false;
-        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes === false)
-            sendPushes = false;
+        let sendPushes = false;
+        if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
+            sendPushes = trnMatch.settings.sendPushes;
+        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+            sendPushes = trnMatch.tournament.settings.sendPushes;
+        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
+            sendPushes = trnMatch.client.settings.sendPushes;
 
         // Check whether the settings allow for a push, else return
         if (!sendPushes)
@@ -626,7 +633,7 @@ class PushNotifications {
 
                 // Send push notification to users that the game has ended.
                 if (!trnMatch.isHidden && !thisMatch.disabled) {
-                    if (pushNotifications && pushNotifications.G3 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
+                    if (sendPushes && pushNotifications && pushNotifications.G3 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
                         log.info(`Sending match full-time G3 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
                         MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgG3, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "final_result");
                     }
@@ -660,6 +667,15 @@ class PushNotifications {
 
         const thisMatch = trnMatch.match;
         let pushNotifications = null;
+        let sendPushes = false;
+
+        if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
+            sendPushes = trnMatch.settings.sendPushes;
+        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+            sendPushes = trnMatch.tournament.settings.sendPushes;
+        else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
+            sendPushes = trnMatch.client.settings.sendPushes;
+
 
         if (trnMatch.settings && trnMatch.settings.pushNotifications)
             pushNotifications = trnMatch.settings.pushNotifications;
@@ -734,11 +750,11 @@ class PushNotifications {
                             (innerCb) => {
                                 // Send push notification to users that the game has started.
                                 if (!trnMatch.isHidden || !thisMatch.disabled) {
-                                    if (error.errorCode === 1001 && pushNotifications && pushNotifications.W1 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
+                                    if (error.errorCode === 1001 && sendPushes && pushNotifications && pushNotifications.W1 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
                                         log.info(`[Match module ${thisMatch.name}]: Sending match warning (error) W1 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
                                         MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgW1, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "all");
                                     }
-                                    if (error.errorCode === 1002 && pushNotifications && pushNotifications.W2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
+                                    if (error.errorCode === 1002 && sendPushes && pushNotifications && pushNotifications.W2 && userIdsHavingPlayedCard && userIdsHavingPlayedCard.length > 0) {
                                         log.info(`[Match module ${thisMatch.name}]: Sending match warning (error) W2 notification to users: ${_.take(userIdsHavingPlayedCard, 9)}, ...`);
                                         MessagingTools.sendPushToUsers(userIdsHavingPlayedCard, msgW2, { "type": "view", "data": { "view": "match", "viewdata": thisMatch.id } }, "all");
                                     }

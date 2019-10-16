@@ -83,7 +83,7 @@ api.add = function (entity, cb) {
 // PUT
 api.edit = function (id, updateData, cb) {
 
-    return Entity.findOneAndUpdate({ _id: id }, { $set: updateData }, function (err, entity) {
+    return Entity.findOneAndUpdate({ _id: id }, { $set: updateData }, { new: true }, function (err, entity) {
         cbf(cb, err, entity);
     });
 };

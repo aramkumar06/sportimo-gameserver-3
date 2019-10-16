@@ -126,19 +126,27 @@ api.add = function (entity, cb) {
 
     let leaderboardTemplate = null;
     let client = null;
+    let tournament = null;
 
     async.waterfall([
         cbk => async.parallel([
                 icbk => mongoose.models.trn_leaderboard_templates.find({ $or: [{ client: entity.client, tournament: entity.tournament }, { client: entity.client, tourmanent: null }] }).limit(1).exec(icbk),
-                icbk => Clients.findById(entity.client, 'settings', icbk)
+                icbk => Clients.findById(entity.client, 'settings', icbk),
+                icbk => Tournaments.findById(entity.tournament, 'settings', icbk)
             ], cbk),
         (parallelResults, cbk) => {
             // Try finding the referrenced match, if existing already in the matches collection, that is not completed
             const templates = parallelResults[0];
             client = parallelResults[1];
+            tournament = parallelResults[2];
 
             if (!client) {
                 const err = new Error(`Invalid client id ${entity.client}`);
+                err.statusCode = 400;
+                return cbk(err);
+            }
+            if (!tournament) {
+                const err = new Error(`Invalid tournament id ${entity.tournament}`);
                 err.statusCode = 400;
                 return cbk(err);
             }
@@ -204,14 +212,11 @@ api.add = function (entity, cb) {
             const tMatch = new Entity(entity);
 
             // Set tMatch settings from client settings, if not there, from default settings
-            tMatch.settings = {
-                sendPushes: ClientDefaultSettings.sendPushes,
-                gameCards: ClientDefaultSettings.gameCards
-            };
-            if (client.settings && client.settings.gameCards)
-                tMatch.settings.gameCards = client.settings.gameCards;
-            if (client.settings && client.settings.sendPushes)
-                tMatch.settings.sendPushes = client.settings.sendPushes;
+            tMatch.settings = _.pick(ClientDefaultSettings, ['sendPushes', 'pushNotifications', 'gameCards', 'displayContestParticipations']);
+            if (client.settings)
+                tMatch.settings = _.assign(tMatch.settings, client.settings);
+            if (tournament.settings)
+                tMatch.settings = _.assign(tMatch.settings, tournament.settings);
             tMatch.markModified('settings');
 
             if (leaderboardTemplate) {
