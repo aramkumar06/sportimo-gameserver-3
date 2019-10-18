@@ -5,6 +5,7 @@ const mongoose = require('mongoose'),
     moment = require('moment'),
     ObjectId = mongoose.Types.ObjectId,
     Entity = require('../../models/tournament'),
+    TournamentMatch = require('../../models/trn_match'),
     LeaderboardDef = mongoose.models.trn_leaderboard_defs,
     async = require('async'),
     _ = require('lodash'),
@@ -118,13 +119,42 @@ api.add = function (clientId, entity, cb) {
 // PUT
 api.edit = function (clientId, id, updateData, cb) {
 
-    updateData.updated = new Date();
+    if (!updateData)
+        return Entity.findById(id, cb);
 
-    return Entity.findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData }, { new: true })
-    .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
-    .exec(function (err, entity) {
-        cbf(cb, err, entity);
-    });
+    updateData.updated = new Date();
+    let tmatchSettings = _.pick(updateData.settings, ['sendPushes', 'pushNotifications', 'gameCards', 'displayContestParticipations']);
+    let entity = null;
+
+    async.waterfall([
+
+        cbk => Entity
+            .findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData }, {  })
+            .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+            .exec(cbk),
+
+        (updatedEntity, cbk) => {
+            entity = updatedEntity;
+
+            if (_.isEqual(entity.settings, updateData.settings))
+                return cbk(null, []);
+
+            TournamentMatch
+                .find({ tournament: id })
+                .populate({ path: 'match', match: { completed: { $ne: true }, state: 0 }, select: 'state' })
+                .exec(cbk);
+        },
+
+        (tmatches, cbk) => {
+            const futureTournamentMatches = _.filter(tmatches, t => !!t.match);
+            const futureTournamentMatchIds = _.map(futureTournamentMatches, '_id');
+
+            TournamentMatch.updateMany({ _id: { $in: futureTournamentMatchIds } }, { $set: { settings: tmatchSettings } }, cbk);
+        },
+
+        (updateResult, cbk) => async.nextTick(() => cbk(null, entity))
+
+    ], cb);
 };
 
 
