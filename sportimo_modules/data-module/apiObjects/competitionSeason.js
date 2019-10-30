@@ -1,10 +1,11 @@
 // Module dependencies.
 var mongoose = require('mongoose'),
-Entity = mongoose.models.trn_competition_seasons,
-Matches = mongoose.models.matches,
-Standings = mongoose.models.trn_standings,
-api = {},
-l=require('../config/lib');
+    ObjectId = mongoose.Types.ObjectId,
+    Entity = mongoose.models.trn_competition_seasons,
+    Matches = mongoose.models.matches,
+    Standings = mongoose.models.trn_standings,
+    api = {},
+    l=require('../config/lib');
 
 
 
@@ -81,6 +82,27 @@ api.deleteInstance = function (id,cb) {
    return cbf(cb,err,true);      
  });
 };
+
+
+// POST
+api.addTeam = function (id, teamId, cb) {
+    return Entity
+        .findByIdAndUpdate(id, { $addToSet: { teams: new ObjectId(teamId) } }, { useFindAndModify: false, new: true })
+        .populate('competition')
+        .populate({ path: 'teams', select: 'name logo abbr' })
+        .exec(cb);
+
+};
+
+// DELETE
+api.removeTeam = function (id, teamId, cb) {
+    return Entity
+        .findByIdAndUpdate(id, { $pull: { teams: new ObjectId(teamId) } }, { useFindAndModify: false, new: true })
+        .populate('competition')
+        .populate({ path: 'teams', select: 'name logo abbr' })
+        .exec(cb);
+};
+
 
 
 /*
