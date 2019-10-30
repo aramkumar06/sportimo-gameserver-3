@@ -157,8 +157,12 @@ api.add = function (entity, cb) {
             if (templates && templates.length > 0)
                 leaderboardTemplate = templates[0];
 
-            if (!simulationMatch && entity._id)
-                matchQuery._id = new ObjectId(entity._id);
+            if (!simulationMatch) {
+                if (entity._id)
+                    matchQuery._id = new ObjectId(entity._id);
+                else 
+                    return cbk(null, []);   // case of manually-moderated match
+            }
             else
                 if (entity.moderation && entity.moderation.length > 0) {
                     matchQuery.$or = [];
@@ -173,8 +177,7 @@ api.add = function (entity, cb) {
                         });
                     });
                 }
-                //else
-                //    return cbk(null, []);
+
 
             return Match.find(matchQuery, '_id moderation name').limit(1).exec(cbk);
         },
@@ -192,6 +195,8 @@ api.add = function (entity, cb) {
                 return cbk(null, entity.match);
             }
             else {
+                // Manually-moderated match, create new
+
                 const mergedData = _.merge(_.cloneDeep(EmptyMatch), entity);
                 const newMatch = new Match(mergedData);
                 newMatch.exclusiveClient = entity.client;
