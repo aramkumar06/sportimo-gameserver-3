@@ -192,7 +192,7 @@ class PushNotifications {
 
                     if (trnMatches[0].settings && trnMatches[0].settings.sendPushes !== undefined && trnMatches[0].settings.sendPushes !== null)
                         sendPushes = trnMatches[0].settings.sendPushes;
-                    else if (trnMatches[0].tournament.settings && trnMatches[0].tournament.settings.sendPushes !== undefined && trnMatches[0].tournament.settings.sendPushes !== null)
+                    else if (trnMatches[0].tournament && trnMatches[0].tournament.settings && trnMatches[0].tournament.settings.sendPushes !== undefined && trnMatches[0].tournament.settings.sendPushes !== null)
                         sendPushes = trnMatches[0].tournament.settings.sendPushes;
                     else if (trnMatches[0].client.settings && trnMatches[0].client.settings.sendPushes !== undefined && trnMatches[0].client.settings.sendPushes !== null)
                         sendPushes = trnMatches[0].client.settings.sendPushes;
@@ -326,7 +326,7 @@ class PushNotifications {
         let sendPushes = false;
         if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
             sendPushes = trnMatch.settings.sendPushes;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+        else if (trnMatch.tournament && trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
             sendPushes = trnMatch.tournament.settings.sendPushes;
         else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
             sendPushes = trnMatch.client.settings.sendPushes;
@@ -488,7 +488,7 @@ class PushNotifications {
         let sendPushes = false;
         if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
             sendPushes = trnMatch.settings.sendPushes;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+        else if (trnMatch.tournament && trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
             sendPushes = trnMatch.tournament.settings.sendPushes;
         else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
             sendPushes = trnMatch.client.settings.sendPushes;
@@ -579,7 +579,7 @@ class PushNotifications {
         let sendPushes = false;
         if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
             sendPushes = trnMatch.settings.sendPushes;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+        else if (trnMatch.tournament && trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
             sendPushes = trnMatch.tournament.settings.sendPushes;
         else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
             sendPushes = trnMatch.client.settings.sendPushes;
@@ -671,7 +671,7 @@ class PushNotifications {
 
         if (trnMatch.settings && trnMatch.settings.sendPushes !== undefined && trnMatch.settings.sendPushes !== null)
             sendPushes = trnMatch.settings.sendPushes;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
+        else if (trnMatch.tournament && trnMatch.tournament.settings && trnMatch.tournament.settings.sendPushes !== undefined && trnMatch.tournament.settings.sendPushes !== null)
             sendPushes = trnMatch.tournament.settings.sendPushes;
         else if (trnMatch.client.settings && trnMatch.client.settings.sendPushes !== undefined && trnMatch.client.settings.sendPushes !== null)
             sendPushes = trnMatch.client.settings.sendPushes;
@@ -679,7 +679,7 @@ class PushNotifications {
 
         if (trnMatch.settings && trnMatch.settings.pushNotifications)
             pushNotifications = trnMatch.settings.pushNotifications;
-        else if (trnMatch.settings && trnMatch.tournament.settings && trnMatch.tournament.settings.pushNotifications)
+        else if (trnMatch.tournament && trnMatch.tournament.settings && trnMatch.tournament.settings.pushNotifications)
             pushNotifications = trnMatch.tournament.settings.pushNotifications;
         else if (trnMatch.client.settings && trnMatch.client.settings.pushNotifications)
             pushNotifications = trnMatch.client.settings.pushNotifications;
