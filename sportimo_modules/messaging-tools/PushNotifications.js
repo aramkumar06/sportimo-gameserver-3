@@ -679,7 +679,7 @@ class PushNotifications {
 
         if (trnMatch.settings && trnMatch.settings.pushNotifications)
             pushNotifications = trnMatch.settings.pushNotifications;
-        else if (trnMatch.tournament.settings && trnMatch.tournament.settings.pushNotifications)
+        else if (trnMatch.settings && trnMatch.tournament.settings && trnMatch.tournament.settings.pushNotifications)
             pushNotifications = trnMatch.tournament.settings.pushNotifications;
         else if (trnMatch.client.settings && trnMatch.client.settings.pushNotifications)
             pushNotifications = trnMatch.client.settings.pushNotifications;
