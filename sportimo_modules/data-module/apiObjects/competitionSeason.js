@@ -3,7 +3,7 @@ var mongoose = require('mongoose'),
     ObjectId = mongoose.Types.ObjectId,
     Entity = mongoose.models.trn_competition_seasons,
     Matches = mongoose.models.matches,
-    Standings = mongoose.models.trn_standings,
+    Standings = require('../../models/trn_team_standing'), //mongoose.models.trn_standings,
     api = {},
     l=require('../config/lib');
 
@@ -63,15 +63,17 @@ api.editInstance = function (id, updateData, cb) {
         if (err) {
             return cbf(cb, err, null);
         }
+
+        return cb(null);
         // Matches.update({ competition: id }, update,function(err,data){
         //   console.log(id);
         //   console.log(err);
-        console.log("Updating visible in...");
-        Standings.update({ competitionid: id }, { $set: { visiblein: update["visiblein"] }},function(err,data){
-            console.log(err);
-            if(!err)
-                return cbf(cb,err,competition.toObject());                 
-        });
+        //console.log("Updating visible in...");
+        //Standings.findOneAndUpdate({ competitionid: id }, { $set: { visiblein: update["visiblein"] } }, function (err, data) {
+        //    console.log(err);
+        //    if(!err)
+        //        return cbf(cb,err,competition.toObject());                 
+        //});
     });
   // });// eo competition.find
 };
