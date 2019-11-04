@@ -113,13 +113,13 @@ api.addTeam = function (req, res) {
 };
 
 
-// POST
+// DELETE
 api.removeTeam = function (req, res) {
     var id = req.params.id;
     var teamId = req.params.teamId;
     return Entity.removeTeam(id, teamId, function (err, data) {
         if (!err) {
-            l.p("addded team");
+            l.p("removed team");
             return res.status(200).json(data);
         } else {
             logger.log('error', err.stack, req.body);

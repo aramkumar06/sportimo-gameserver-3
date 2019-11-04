@@ -41,19 +41,6 @@ api.searchTeams = function (req, res) {
 }
 
 
-api.ClonePlayersTo = function (req, res) {
-    var teamFrom = req.params.teamFrom;
-	var teamTo = req.params.teamTo;
-	
-	team.clonePlayers(teamFrom, teamTo, function(err,data){
-        if (err) {
-			res.status(500).json(err);
-		} else {
-			res.status(200).json(data);
-		}
-	}); 
-}
-
 
 // POST
 api.addteam = function (req, res) {
@@ -149,6 +136,39 @@ api.deleteAllTeams = function (req, res) {
 	});
 };
 
+
+// POST
+api.addPlayer = function (req, res) {
+    var id = req.params.id;
+    var playerId = req.params.playerId;
+    return team.addPlayer(id, playerId, function (err, data) {
+        if (!err) {
+            l.p("addded player");
+            return res.status(200).json(data);
+        } else {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        }
+    });
+};
+
+
+// DELETE
+api.removePlayer = function (req, res) {
+    var id = req.params.id;
+    var playerId = req.params.playerId;
+    return team.removePlayer(id, playerId, function (err, data) {
+        if (!err) {
+            l.p("removed player");
+            return res.status(200).json(data);
+        } else {
+            logger.log('error', err.stack, req.body);
+            return res.status(500).json(err);
+        }
+    });
+};
+
+
 /*
 =====================  ROUTES  =====================
 */
@@ -163,10 +183,12 @@ router.route('/v1/data/teams/:id')
 
 router.get('/v1/data/teams/search/:searchTerm', api.searchTeams);
 
-router.get('/v1/data/teams/cloneplayers/:teamFrom/:teamTo', api.ClonePlayersTo);
-
 router.route('/v1/data/teams/:id/full')
-.get(api.teamFull);
+    .get(api.teamFull);
+
+router.post('/v1/data/teams/:id/:playerId', api.addPlayer);
+router.delete('/v1/data/teams/:id/:playerId', api.removePlayer);
+
 
 router.route('/v1/data/teams/:id/favorite')
 .get(api.teamFavoriteData);

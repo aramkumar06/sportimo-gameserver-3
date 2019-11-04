@@ -2,11 +2,12 @@
 
 // Module dependencies.
 var mongoose = require('mongoose'),
-  moment = require('moment'),
-  Team = mongoose.models.trn_teams,
-  TeamStats = mongoose.models.trn_teamstats,
-  api = {},
-  parserName = 'Statscore';
+    ObjectId = mongoose.Types.ObjectId,
+    moment = require('moment'),
+    Team = mongoose.models.trn_teams,
+    TeamStats = mongoose.models.trn_teamstats,
+    api = {},
+    parserName = 'Statscore';
 
 
 
@@ -33,6 +34,8 @@ api.getAllTeams = function (skip, limit, cb) {
 api.getTeam = function (id, cb) {
     var q = Team.findById(id);
 
+    q.populate('players', 'name pic position');
+
     //q.populate('nextmatch.home_team', 'name logo');
     //q.populate('nextmatch.away_team', 'name logo');
     //q.populate('lastmatch.home_team', 'name logo');
@@ -51,7 +54,7 @@ api.getTeamFull = function (id, cb) {
     async.parallel([
 
         (cbk) => {
-            Team.findById(id).populate('players').exec(cbk);
+            Team.findById(id).populate('players', 'name pic position').exec(cbk);
         },
         (cbk) => {
             TeamStats.find({ team: id }, cbk);
@@ -92,10 +95,9 @@ api.searchTeams = function (searchTerm, competitionId, cb) {
             //{ $text: { $search: searchTerm } }
         ]
     };
-    if (competitionId)
-        query.competitionid = competitionId;
 
     Team.find(query)
+        .populate('players', 'name pic position')
         .exec(function (err, teams) {
             return cbf(cb, err, teams);
         });
@@ -178,6 +180,28 @@ api.deleteTeam = function (id, cb) {
         return cbf(cb, err, true);
     });
 };
+
+
+
+
+// POST
+api.addPlayer = function (id, playerId, cb) {
+    return Team
+        .findByIdAndUpdate(id, { $addToSet: { players: new ObjectId(playerId) } }, { useFindAndModify: false, new: true })
+        .populate({ path: 'players', select: 'name pic position' })
+        .exec(cb);
+
+};
+
+// DELETE
+api.removePlayer = function (id, playerId, cb) {
+    return Team
+        .findByIdAndUpdate(id, { $pull: { players: new ObjectId(playerId) } }, { useFindAndModify: false, new: true })
+        .populate({ path: 'players', select: 'name pic position' })
+        .exec(cb);
+};
+
+
 
 
 /*
