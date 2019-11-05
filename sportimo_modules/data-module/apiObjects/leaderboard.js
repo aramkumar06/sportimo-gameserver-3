@@ -1,9 +1,12 @@
 ﻿'use strict';
 
 // Module dependencies.
-const     mongoose = require('mongoose');
+const
+    mongoose = require('mongoose'),
+    ObjectId = mongoose.Types.ObjectId;
 const 
     Users = require('../../models/user'),
+    Leaderboards = require('../../models/trn_leaderboard_def'),
     Tournament = require('../../models/tournament'),
     TournamentMatch = require('../../models/trn_match'),
     GrandPrize = require('../../models/trn_grand_prize'),
@@ -14,6 +17,47 @@ const
 const api = {};
 
 
+api.getAllTournament = function (clientId, skip, limit,  cb) {
+    const query = {};
+    if (clientId)
+        query.client = clientId;
+
+    return Tournament
+        .find({ leaderboardDefinition: { $ne: null } })
+        .populate('leaderboardDefinition', 'title active')
+        .exec(cb);
+};
+
+api.getAllMatch = function (clientId, skip, limit,  cb) {
+    const query = {};
+    if (clientId)
+        query.client = clientId;
+
+    TournamentMatch
+        .find({ leaderboardDefinition: { $ne: null } })
+        .populate('leaderboardDefinition', 'title active')
+        .populate({ path: 'tournament' })
+        .exec(cb);
+};
+
+
+api.getLeaders = function (clientId, leaderboardId, cb) {
+
+    const query = { _id: new ObjectId(leaderboardId) };
+
+    Leaderboards.find(query, (err, leaderboard) => {
+        if (err)
+            return cb(err);
+
+        if (!leaderboard || leaderboard.length === 0)
+            return cb(null, []);
+
+        if (leaderboard[0].tournamentMatch)
+            return api.getMatchLeaders(clientId, leaderboard[0].tournament, leaderboard[0].tournamentMatch.toHexString(), cb);
+        else
+            return api.getTournamentLeaders(clientId, leaderboard[0].tournament.toHexString(), cb);
+    });
+};
 
 
 api.getGrandPrizeLeaders = function (clientId, grandPrizeId, cb) {

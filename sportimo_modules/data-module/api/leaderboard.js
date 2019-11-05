@@ -10,7 +10,9 @@ var express = require('express'),
 
 
 
-router.get('/v1/data/leaderboards', (req, res) => {
+router.get('/v1/data/leaderboards/tournament', (req, res) => {
+
+    var clientId = req.query.client;
 
     var skip = null, limit = null;
 
@@ -20,7 +22,7 @@ router.get('/v1/data/leaderboards', (req, res) => {
     if (req.query.limit !== undefined)
         limit = req.query.limit;
 
-    entity.getAll(req.query.client, req.query.tournament, req.query.match, skip, limit, function (err, data) {
+    entity.getAllTournament(clientId, skip, limit, function (err, data) {
         if (err) {
             res.status(500).json(err);
         } else {
@@ -30,47 +32,43 @@ router.get('/v1/data/leaderboards', (req, res) => {
 });
 
 
+router.get('/v1/data/leaderboards/match', (req, res) => {
 
-router.post('/v1/data/leaderboards', (req, res) => {
+    var clientId = req.query.client;
 
-    entity.add(req.body, function (err, data) {
+    var skip = null, limit = null;
+
+    if (req.query.skip !== undefined)
+        skip = req.query.skip;
+
+    if (req.query.limit !== undefined)
+        limit = req.query.limit;
+
+    entity.getAllMatch(clientId, skip, limit, function (err, data) {
         if (err) {
             res.status(500).json(err);
-            logger.log('error', err.stack, req.body);
-        }
-        else {
-            res.status(201).json(data);
-        }
-    });
-});
-
-
-router.put('/v1/data/leaderboards/:id', (req, res) => {
-
-    return entity.edit(req.params.id, req.body, function (err, data) {
-        if (!err) {
-            return res.status(200).json(data);
         } else {
-            logger.log('error', err.stack, req.body);
-            return res.status(500).json(err);
+            res.status(200).json(data);
         }
     });
 });
 
 
-router.delete('/v1/data/leaderboards/:id', (req, res) => {
+router.get('/v1/data/leaderboards/:id/leaders', (req, res) => {
 
-    var id = req.params.id;
+    var clientId = req.query.client;
+    var leaderboardId = req.params.id;
 
-    return entity.delete(req.query.client, id, function (err, data) {
-        if (!err) {
-            return res.status(204).send();
+    entity.getLeaders(clientId, leaderboardId,  function (err, data) {
+        if (err) {
+            res.status(500).json(err);
         } else {
-            logger.log('error', err.stack, req.body);
-            return res.status(500).json(err);
+            res.status(200).json(data);
         }
     });
 });
+
+
 
 
 
