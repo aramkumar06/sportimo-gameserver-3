@@ -88,7 +88,7 @@ api.item = function (req, res) {
     var season;
     if (req.params.season) {
         season = req.params.season;
-        api.getCompetition(req.params.id, season, res);
+        api.getCompetition(req, req.params.id, season, res);
     }
     else {
         competitions.findById(req.params.id, (err, competition) => {
@@ -99,7 +99,7 @@ api.item = function (req, res) {
                 if (!competition || !competition.season)
                     return res.status(404).json({});
 
-                api.getCompetition(req.params.id, competition.season, res);
+                api.getCompetition(req, req.params.id, competition.season, res);
             }
         });
     }
@@ -107,7 +107,7 @@ api.item = function (req, res) {
 
 };
 
-api.getCompetition = function (competitionid, season, res) {
+api.getCompetition = function (req, competitionid, season, res) {
 
     item
         .findOne({ competition: competitionid, season: season })
