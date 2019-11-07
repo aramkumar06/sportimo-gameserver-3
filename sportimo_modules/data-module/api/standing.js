@@ -5,7 +5,7 @@ var express = require('express'),
     item = mongoose.models.trn_team_standings,
     logger = require('winston'),
     api = {};
-var knockouts = mongoose.models.knockoutStandings,
+var knockouts = require('../../models/trn_team_standing_knockout'),
     competitions = mongoose.models.trn_competitions;
 
 
@@ -107,17 +107,17 @@ api.item = function (req, res) {
 
 };
 
-api.getCompetition = function (req, competitionid, season, res) {
+api.getCompetition = function (req, competitionid, seasonId, res) {
 
     item
-        .findOne({ competition: competitionid, season: season })
+        .findOne({ competition: competitionid, season: seasonId })
         .populate('competition')
         .populate('season', '-teams')
         .exec(function (err, returnedItem) {
 
             if (!err) {
-                if (returnedItem || season == 2016) {
-                    knockouts.findOne({ competitionid: competitionid, season: season }, function (err, standingKnockouts) {
+                if (returnedItem) {
+                    knockouts.findOne({ competition: competitionid, season: seasonId }, function (err, standingKnockouts) {
                         if (!err) {
                             if (returnedItem) {
                                 returnedItem = returnedItem.toObject();
