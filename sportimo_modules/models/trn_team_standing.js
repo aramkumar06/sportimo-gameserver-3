@@ -28,9 +28,6 @@ else {
     };
     
     var standingSchema = new Schema(standing);
-    
-    standingSchema.index({ competitionid: 1, season: 1}, { unique: true });
-
-    
+        
     module.exports = mongoose.model('trn_team_standings', standingSchema);
 }
