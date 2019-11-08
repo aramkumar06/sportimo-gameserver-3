@@ -114,26 +114,26 @@ api.getCompetition = function (req, competitionid, seasonId, res) {
         .populate('competition')
         .populate('season', '-teams')
         .exec(function (err, returnedItem) {
-
-            if (!err) {
-                if (returnedItem) {
-                    knockouts.findOne({ competition: competitionid, season: seasonId }, function (err, standingKnockouts) {
-                        if (!err) {
-                            if (returnedItem) {
-                                returnedItem = returnedItem.toObject();
-                                returnedItem.knockouts = standingKnockouts;
-                            }
-                            return res.status(200).json(returnedItem);
-                        } else {
-                            logger.log('error', err.stack, req.body);
-                            return res.status(500).json(err);
-                        }
-                    });
-                }
-            } else {
+            if (err) {
                 logger.log('error', err.stack, req.body);
                 return res.status(500).json(err);
             }
+
+            if (!returnedItem)
+                return res.json(null);
+
+            knockouts.findOne({ competition: competitionid, season: seasonId }, function (err, standingKnockouts) {
+                if (err) {
+                    logger.log('error', err.stack, req.body);
+                    return res.status(500).json(err);
+                }
+
+                if (returnedItem) {
+                    returnedItem = returnedItem.toObject();
+                    returnedItem.knockouts = standingKnockouts;
+                }
+                return res.json(returnedItem);
+            });
         });
 };
 
