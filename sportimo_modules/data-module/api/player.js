@@ -126,7 +126,7 @@ api.deletePlayer = function (req, res) {
 			return res.status(204).send();
 		} else {
 			l.p(err);
-			return res.status(500).json(err);
+			return res.status(err.statusCode || 500).json(err);
 		}
 	});
 };
