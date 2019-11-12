@@ -3,6 +3,7 @@
 
 // Module dependencies.
 var mongoose = require('mongoose'),
+    ObjectId = mongoose.Types.ObjectId,
     _ = require('lodash'),
   Player = mongoose.models.trn_players,
   Team = mongoose.models.trn_teams,
