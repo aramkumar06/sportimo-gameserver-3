@@ -159,7 +159,7 @@ api.delete = function (id, cb) {
             return cb(err);
 
         if (belongsToTeam) {
-            var err = new Error(`Cannot delete player ${id}, please remove from team ${belongsToTeam.name.en}`);
+            err = new Error(`Cannot delete player ${id}, please remove from team ${!belongsToTeam.name ? belongsToTeam._id : belongsToTeam.name.en}`);
             err.statusCode = 309;   // Conflict
             return cb(err);
         }
