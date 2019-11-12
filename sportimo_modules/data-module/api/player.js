@@ -91,7 +91,7 @@ api.addplayer = function (req, res) {
 	player.add(req.body,function	(err,data){
         if (err) {
             logger.log('error', err.stack, req.body);
-            res.status(500).json(err);
+            return res.status(err.statusCode || 500).json({ message: err.message, statusCode: err.statusCode || 500 });
         }
 		else {
 			res.status(201).json(data);
@@ -110,7 +110,7 @@ api.editPlayer = function (req, res) {
 			return res.status(200).json(data);
         } else {
             logger.log('error', err.stack, req.body);
-			return res.status(500).json(err);
+            return res.status(err.statusCode || 500).json({ message: err.message, statusCode: err.statusCode || 500 });
 		}
 	});
 };
@@ -125,8 +125,8 @@ api.deletePlayer = function (req, res) {
 			l.p("removed player");
 			return res.status(204).send();
 		} else {
-			l.p(err);
-			return res.status(err.statusCode || 500).json(err);
+            l.p(err);
+            return res.status(err.statusCode || 500).json({ message: err.message, statusCode: err.statusCode || 500 });
 		}
 	});
 };
