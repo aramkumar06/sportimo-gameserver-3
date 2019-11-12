@@ -154,12 +154,12 @@ api.edit = function (id, updateData, cb) {
 
 // DELETE
 api.delete = function (id, cb) {
-    Team.find({ players: new ObjectId(id) }, '_id name', (err, belongsToTeam) => {
+    Team.find({ players: new ObjectId(id) }, '_id name').limit(1).exec((err, belongsToTeams) => {
         if (err)
             return cb(err);
 
-        if (belongsToTeam) {
-            err = new Error(`Cannot delete player ${id}, please remove from team ${!belongsToTeam.name ? belongsToTeam._id : belongsToTeam.name.en}`);
+        if (belongsToTeams && belongsToTeams.length > 0) {
+            err = new Error(`Cannot delete player ${id}, please remove from team ${!belongsToTeams[0].name ? belongsToTeams[0]._id : belongsToTeams[0].name.en}`);
             err.statusCode = 309;   // Conflict
             return cb(err);
         }
