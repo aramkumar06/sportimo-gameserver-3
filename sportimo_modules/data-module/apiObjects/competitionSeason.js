@@ -35,9 +35,12 @@ api.getAllInstances = function (skip, limit, status, cb) {
 // GET
 api.getInstance = function (id,cb) {
 
-    Entity.findOne({ '_id': id }).populate('competition').exec(function(err, competition) {
-    cbf(cb,err,competition);
-  });
+    Entity.findOne({ '_id': id })
+        .populate('competition')
+        .populate({ path: 'teams', select: 'name logo abbr' })
+        .exec(function (err, competition) {
+            cbf(cb,err,competition);
+        });
 };
 
 // POST
