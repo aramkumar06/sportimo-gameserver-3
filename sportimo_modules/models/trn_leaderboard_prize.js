@@ -14,7 +14,8 @@ else {
 
     var leaderboardPrizeSchema = new Schema({
         position: { type: positionType },
-        prize: { type: ObjectId, ref: 'trn_prizes', required: true }
+        prize: { type: ObjectId, ref: 'trn_prizes', required: true },
+        winners: [{ type: ObjectId, ref: 'users' }]
     });
 
     module.exports = leaderboardPrizeSchema;

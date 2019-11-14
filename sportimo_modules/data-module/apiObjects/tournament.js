@@ -20,7 +20,7 @@ const mongoose = require('mongoose'),
 // ALL
 api.getAll = function (clientId, skip, limit, cb) {
     var q = Entity.find({ client: clientId });
-    q.populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } });
+    q.populate({ path: 'leaderboardDefinition', populate: [{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }] });
 
     if (skip !== undefined)
         q.skip(skip * 1);
@@ -38,7 +38,7 @@ api.getAll = function (clientId, skip, limit, cb) {
 api.getById = function (clientId, id, cb) {
     Entity
         .findById(id)
-        .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+        .populate({ path: 'leaderboardDefinition', populate: [{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }] })
         .exec(function (err, entity) {
             if (!err && entity && (clientId !== entity.client.toHexString()))
                 err = new Error(`Conflict between provided clientId and tournament's referred client id`);
@@ -67,7 +67,7 @@ api.search = function (clientId, searchTerm, competitionId, cb) {
         query.competitionid = competitionId;
 
     Entity.find(query)
-        .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+        .populate({ path: 'leaderboardDefinition', populate: [{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }] })
         .exec(function (err, entities) {
             return cbf(cb, err, entities);
         });
@@ -130,7 +130,7 @@ api.edit = function (clientId, id, updateData, cb) {
 
         cbk => Entity
             .findOneAndUpdate({ client: clientId, _id: id }, { $set: updateData }, {  })
-            .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+            .populate({ path: 'leaderboardDefinition', populate: [{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }] })
             .exec(cbk),
 
         (updatedEntity, cbk) => {
@@ -180,7 +180,7 @@ api.addLeaderboardDef = function (clientId, id, entity, cb) {
         cbk => entity.save(cbk),
         (savedDef, cbk) => Entity
             .findOneAndUpdate({ _id: new ObjectId(id), client: clientId }, { $set: { leaderboardDefinition: savedDef.id } }, { new: true })
-            .populate({ path: 'leaderboardDefinition', populate: { path: 'prizes.prize' } })
+            .populate({ path: 'leaderboardDefinition', populate: [{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }] })
             .exec(cbk)
     ], function (err, updatedEntity) {
         cbf(cb, err, updatedEntity.toObject());
