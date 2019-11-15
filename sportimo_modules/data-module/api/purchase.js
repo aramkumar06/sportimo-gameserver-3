@@ -8,7 +8,7 @@ l=require('../config/lib');
 var api = {};
 // GET ALL
 api.purchases = function (req, res) {
-	var skip=null,limit=10;
+	var skip=null, limit=null;
 
 	if(req.query.skip!=undefined)
 		skip=req.query.skip;

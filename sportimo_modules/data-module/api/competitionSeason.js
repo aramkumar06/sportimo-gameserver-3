@@ -8,7 +8,7 @@ l=require('../config/lib');
 var api = {};
 // ALL
 api.getInstances = function (req, res) {
-	var skip = null, limit = 10, status = null;
+	var skip = null, limit = null, status = null;
 
 	if(req.query.skip !== undefined)
 		skip = req.query.skip;
