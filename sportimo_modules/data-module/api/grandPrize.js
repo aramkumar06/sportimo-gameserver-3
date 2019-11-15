@@ -27,7 +27,9 @@ router.get('/v1/data/grand-prizes', (req, res) => {
     if (req.query.client)
         query.client = req.query.client;
 
-    grandPrize.find(query, options).populate('prizes.prize').exec((err, data) => {
+    grandPrize.find(query, options)
+        .populate([{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }])
+        .exec((err, data) => {
         if (err) {
             logger.error(`Error getting all grand prizes: ${err.stack}`);
             return res.status(500).json(err);
@@ -156,7 +158,7 @@ router.get('/v1/data/client/:clientId/grand-prizes', (req, res) => {
         startFromDate: { $lte: now },
         endToDate: { $gt: now } // maybe comment this one
     })
-    .populate('prizes.prize')
+    .populate([{ path: 'prizes.prize' }, { path: 'prizes.winners', select: '_id username email picture' }])
     // We place a limit under the assumption that up to ONE grand prize may exist
     .limit(1)
     .exec(function (err, data) {
