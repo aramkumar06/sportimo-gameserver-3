@@ -39,7 +39,8 @@ const findReplayableMatches = function (competitionId, callback) {
         (parallelResults, cbk) => {
 
             matchCandidates = parallelResults[0];
-            competitionSeasons = parallelResults[1];
+            // Get only competition seasons that are bound to competitions
+            competitionSeasons = _.filter(parallelResults[1], 'competition');
             const matchIds = _.map(parallelResults[0], i => i.id);
             const query = { 'diffed_events.Statscore': { $ne: null } };
             if (matchIds.length > 0)
