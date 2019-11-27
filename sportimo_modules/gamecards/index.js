@@ -1340,7 +1340,7 @@ gamecards.Tick = function () {
         function (callback) {
             // Update all wildcards that are due for activation
             // ToDo: Check that the appearance criteria are also met
-            return db.models.trn_card_definitions.update({ status: 0, activationTime: { $lt: itsNow } }, { $set: { status: 1 } }, { multi: true }, callback);
+            return db.models.trn_card_definitions.updateMany({ status: 0, activationTime: { $lt: itsNow } }, { $set: { status: 1 } }, callback);
         },
         function (callback) {
             // Update all special gamecards (power-ups) still in play that should be activated
@@ -1562,7 +1562,7 @@ gamecards.Tick = function () {
                         function (parallelCbk) {
                             var systemTime = itsNow.toDate();
                             if (match.state == 2 || match.state == 4) {
-                                UserGamecard.update({ matchid: match.id, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
+                                UserGamecard.updateMany({ matchid: match.id, cardType: { $in: ['Instant', 'PresetInstant'] }, status: 1 }, { $set: { status: 3, pauseTime: systemTime } }, function (error, results) {
                                     if (error) {
                                         log.error('Failed to pause user gamecards after segment ' + (match.state - 1) + ' ends on match id %s !!!', match.id);
                                         log.error(`due to: ${error.stack}`);

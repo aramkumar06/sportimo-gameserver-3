@@ -155,25 +155,27 @@ else {
                     tournamentMatch: tournamentMatch.id,
                     room: tournamentMatch.match.id
                 }
-            }, { upsert: true, new: true }, function (err, result) {
+            }, { upsert: true }, function (err, result) {
                 if (err) {
                     console.error(err);
 
-                    if (cb)
-                        return cb(err, null);
+                    return !cb ? null : cb(err, null);
                 }
 
-                if (result && !result.matchesPlayed) {
-                    mongoose.model('users').findByIdAndUpdate(userId, { $inc: { 'stats.matchesPlayed': 1 } }, function (err, result) {
+                if (!result) 
+                    return !cb ? null : cb(null, null);
+
+
+                if (!result.matchesPlayed) {
+                    mongoose.model('users').findByIdAndUpdate(userId, { $inc: { 'stats.matchesPlayed': 1 } }, { new: true }, function (err, result) {
                         if (err)
                             console.error(err);
 
-                        if (cb)
-                            return cb(err, result);
+                        return !cb ? result : cb(err, result);
                     });
                 } else {
-                    if (cb)
-                        return cb(null, result);
+                    result.matchesPlayed = 1;
+                    return !cb ? result : cb(null, result);
                 }
             });
     };
