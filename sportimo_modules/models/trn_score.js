@@ -43,9 +43,8 @@ else {
     //scoreSchema.index({ lastActive: -1 });
     scoreSchema.index({ user: 1, tournamentMatch: 1 });
 
-    scoreSchema.statics.AddPoints = function (userId, matchId, points, m_date, cb) {
+    scoreSchema.statics.AddPoints = function (userId, tournamentId, tournamentMatchId, matchId, points, m_date, cb) {
 
-        let tournamentsInvolved = 0;
         let user = null;
 
         async.waterfall([
@@ -59,49 +58,49 @@ else {
                 user = parallelResults[0];
                 const subscriptions = parallelResults[1];
 
-                if (!user || subscriptions.length === 0) {
+                //if (!user || subscriptions.length === 0) {
+                if (!user) {
                     log.error(`Failed to add score of ${points} to user ${userId} for match ${matchId}. No such user is found or no valid subscriptions exist.`);
                     return cbk(null, []);
                 }
 
-                const tournamentIds = _.map(subscriptions, 'tournament');
-                mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
+                //const tournamentIds = _.map(subscriptions, 'tournament');
+                //mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
+                mongoose.model('trn_matches').find({ _id: tournamentMatchId, client: user.client, tournament: tournamentId, match: matchId }, { settings: 0 }, cbk);
             },
             (trnMatches, cbk) => {
                 if (!trnMatches || trnMatches.length === 0)
                     return cbk(null);
 
-                tournamentsInvolved = trnMatches.length;
+                const trnMatch = trnMatches[0];
 
-                async.each(trnMatches, (trnMatch, matchCbk) => {
-                    mongoose.model('trn_scores').findOneAndUpdate(
-                        {
+                mongoose.model('trn_scores').findOneAndUpdate(
+                    {
+                        user_id: userId,
+                        client: trnMatch.client,
+                        tournament: trnMatch.tournament,
+                        tournamentMatch: trnMatch.id,
+                        game_id: matchId
+                    },
+                    {
+                        $set: {
                             user_id: userId,
                             client: trnMatch.client,
                             tournament: trnMatch.tournament,
                             tournamentMatch: trnMatch.id,
-                            game_id: matchId
+                            game_id: matchId,
+                            pic: user.picture,
+                            user_name: user.username,
+                            country: user.country,
+                            level: user.level,
+                            match_date: m_date
                         },
-                        {
-                            $set: {
-                                user_id: userId,
-                                client: trnMatch.client,
-                                tournament: trnMatch.tournament,
-                                tournamentMatch: trnMatch.id,
-                                game_id: matchId,
-                                pic: user.picture,
-                                user_name: user.username,
-                                country: user.country,
-                                level: user.level,
-                                match_date: m_date
-                            },
-                            $inc: {
-                                score: points
-                            }
-                        },
-                        { upsert: true, new: true },
-                        matchCbk);
-                }, cbk);
+                        $inc: {
+                            score: points
+                        }
+                    },
+                    { upsert: true, new: true },
+                    cbk);
             }
         ], cb);
     };

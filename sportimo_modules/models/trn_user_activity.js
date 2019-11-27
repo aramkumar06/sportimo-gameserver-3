@@ -63,15 +63,13 @@ else {
      * @param {Function} cb a function callback
      * @returns The trn_user_activities document update result
      */
-    schema.statics.IncrementStat = function (userId, matchId, stat, byvalue, cb) {
+    schema.statics.IncrementStat = function (userId, tournamentId, tournamentMatchId, matchId, stat, byvalue, cb) {
         var statIncr = {};
 
         var stats = _.split(stat, ' ');
         _.each(stats, function (word) {
             statIncr[word] = byvalue;
         });
-
-        let tournamentsInvolved = 0;
 
         async.waterfall([
             (cbk) => {
@@ -84,44 +82,44 @@ else {
                 const user = parallelResults[0];
                 const subscriptions = parallelResults[1];
 
-                if (!user || subscriptions.length === 0) {
+                //if (!user || subscriptions.length === 0) {
+                if (!user) {
                     log.error(`Failed to add user activity to user ${userId} for match ${matchId}. No such user is found.`);
                     return cbk(null, []);
                 }
 
-                const tournamentIds = _.map(subscriptions, 'tournament');
-                mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
+                //const tournamentIds = _.map(subscriptions, 'tournament');
+                //mongoose.model('trn_matches').find({ client: user.client, tournament: { $in: tournamentIds }, match: matchId }, cbk);
+                mongoose.model('trn_matches').find({ _id: tournamentMatchId, client: user.client, tournament: tournamentId, match: matchId }, { settings: 0 }, cbk);
             },
             (trnMatches, cbk) => {
                 if (!trnMatches || trnMatches.length === 0)
                     return cbk(null);
 
-                tournamentsInvolved = trnMatches.length;
+                const trnMatch = trnMatches[0];
+                mongoose.model('trn_user_activities').findOneAndUpdate({
+                    user: userId,
+                    client: trnMatch.client,
+                    tournament: trnMatch.tournament,
+                    tournamentMatch: trnMatch.id,
+                    room: matchId
+                }, {
+                        $inc: statIncr,
+                        $set: {
+                            user: userId,
+                            client: trnMatch.client,
+                            tournament: trnMatch.tournament,
+                            tournamentMatch: trnMatch.id,
+                            room: matchId
+                        }
+                }, { upsert: true, new: true }, cbk);
 
-                async.each(trnMatches, (trnMatch, matchCbk) => {
-                    mongoose.model('trn_user_activities').findOneAndUpdate({
-                        user: userId,
-                        client: trnMatch.client,
-                        tournament: trnMatch.tournament,
-                        tournamentMatch: trnMatch.id,
-                        room: matchId
-                    }, {
-                            $inc: statIncr,
-                            $set: {
-                                user: userId,
-                                client: trnMatch.client,
-                                tournament: trnMatch.tournament,
-                                tournamentMatch: trnMatch.id,
-                                room: matchId
-                            }
-                        }, { upsert: true, new: true }, matchCbk);
-                }, cbk);
             },
             (activityUpdateResult, cbk) => {
                 var statsPath = {};
 
                 _.each(stats, function (word) {
-                    statsPath['stats.' + word] = tournamentsInvolved * byvalue;
+                    statsPath['stats.' + word] = byvalue;
                 });
 
                 mongoose.model('users').findByIdAndUpdate(userId, { $inc: statsPath }, cbk);
