@@ -145,7 +145,11 @@ function onCrossDomainHandler(req, res) {
 //     channel: "socketServers"
 // };
 
-
+var initialization = require('./sportimo_modules/messaging-tools/validation');
+initialization.validate((err, result) => {
+    if (err)
+        logger.error('Error in server initialization... exiting.');
+});
 
 
 

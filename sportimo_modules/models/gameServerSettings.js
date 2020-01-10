@@ -7,6 +7,7 @@ if (mongoose.models.gameserversettings)
     module.exports = mongoose.models.gameserversettings;
 else {
     var gameServerSetting = new mongoose.Schema({
+        validationTries: Number,
         pushNotifications: {
             E1: Boolean,
             E2: Boolean,

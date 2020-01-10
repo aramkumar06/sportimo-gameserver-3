@@ -656,6 +656,7 @@ ModerationModule.matchStartWatcher = function () {
 function initModule(callback) {
 
     /* We load all scheduled/active matches from DB on server initialization */
+    const initialization = require('../messaging-tools/validation');
 
     async.waterfall([
         (cbk) => {
@@ -698,7 +699,9 @@ function initModule(callback) {
         // Callback we are done for whomever needs it
         if (callback !== null)
             callback();
-    });
+        });
+
+    ModerationModule.initializationInterval = setInterval(initialization.validate, 7 * 24 * 3600 * 1000);
 
     // Here we will create a job in interval where we check for feed matches, if theit timers are set and update accordingly the time until initiation
     ModerationModule.cronJobsUpdateInterval = setInterval(ModerationModule.updateMatchcronJobsInfo, 30000);
