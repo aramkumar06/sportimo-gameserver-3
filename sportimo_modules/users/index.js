@@ -2052,6 +2052,9 @@ apiRoutes.post('/v1/users/subscription', (req, res) => {
                 return cbk(err);
             }
 
+            const itsNow = new Date();
+            // Validate date?? if (body.date < itsNow) ...
+
             user.subscriptionEnd = body.date;
 
             // ToDo: create a user event regarding the subscription, with the subscription body, headers, host
