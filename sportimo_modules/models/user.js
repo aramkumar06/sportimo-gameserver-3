@@ -19,18 +19,19 @@ var userStats = new Schema({
 });
 
 
-var achievement = new Schema({
-    uniqueid: String,
-    icon: String,
-    title: mongoose.Schema.Types.Mixed,
-    text: mongoose.Schema.Types.Mixed,
-    has: Number,
-    value: Number,
-    total: Number,
-    completed: Boolean
-});
+// var achievement = new Schema({
+//     uniqueid: String,
+//     icon: String,
+//     title: mongoose.Schema.Types.Mixed,
+//     text: mongoose.Schema.Types.Mixed,
+//     has: Number,
+//     value: Number,
+//     total: Number,
+//     completed: Boolean
+// });
 
-var Achievements = mongoose.model('achievements', achievement);
+// var Achievements = mongoose.model('achievements', achievement);
+var Achievements = require('../models/achievement');
 
 var favTeamSchema = new Schema({
     competition: { type: Schema.Types.ObjectId, ref: 'trn_competitions' },
@@ -120,7 +121,7 @@ var UserSchema = new Schema(
         },
         stats: mongoose.Schema.Types.Mixed,
         level: { type: Number, default: 0 },
-        achievements: [achievement],
+        achievements: [Achievements.schema],
         blockedusers: [String],
         // This is obsolete now
         favoriteteams: [String],

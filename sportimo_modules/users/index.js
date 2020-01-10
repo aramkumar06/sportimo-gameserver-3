@@ -1712,6 +1712,8 @@ apiRoutes.get('/v1/users/update/achievements/:recalculate', function (req, res) 
         var achievsCount = achievs.length;
 
         _.each(achievs, function (achievement) {
+            console.log(achievement.title);
+            
             User.update({ 'achievements._id': achievement._id, deletedAt: null }, { $set: { 'achievements.$.icon': achievement.icon, 'achievements.$.text': achievement.text, 'achievements.$.title': achievement.title, 'achievements.$.total': achievement.total, 'achievements.$.value': achievement.value } }, { multi: true }, function (err) {
                 User.update({ 'achievements._id': { '$ne': achievement._id }, deletedAt: null }, { $addToSet: { 'achievements': achievement } }, { multi: true }, function (err) {
                     achievsCount--;
