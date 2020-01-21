@@ -876,13 +876,11 @@ var matchModule = function (match, shouldInitAutoFeed) {
                 log.info(`[Match module ${HookedMatch.name}]: Match has reached ${thisMatch.time}'`);
             });
 
-            // UNCOMMENT THE FOLLOWING BEFORE SWITCHING TO PRODUCTION!!
-
             // SPI 201 - Auto-Terminate leftover matches 
-            //if (thisMatch.time > 160) {
-            //    console.log(`[Match module ${HookedMatch.name}]: -- Terminating leftover match`);
-            //    HookedMatch.TerminateMatch();
-            //}
+            if (thisMatch.time > 160) {
+                console.log(`[Match module ${HookedMatch.name}]: -- Terminating leftover match`);
+                HookedMatch.TerminateMatch();
+            }
         });
     }
 

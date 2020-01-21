@@ -781,11 +781,9 @@ class PushNotifications {
             },
             // Disable match if not disabled already
 
-            // ToDo: Resume again before deploying in PRODUCTION !!!!!!
-
-            //(cb) => {
-            //    return tournamentMatches.findOneAndUpdate({ _id: trnMatch._id }, { isHidden: true }).exec(cb);
-            //}
+            (cb) => {
+                return tournamentMatches.findOneAndUpdate({ _id: trnMatch._id }, { isHidden: true }).exec(cb);
+            }
         ], () => {
             return callback(error);
         });

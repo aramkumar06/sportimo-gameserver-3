@@ -575,16 +575,14 @@ Parser.prototype.init = function (cbk) {
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
                         return asyncCbk(null);
                     }
-
-                    // !! Uncomment before PRODUCTION !!
-
-                    //else {
-                    //    StartQueueReceiver(that.matchParserId);
-                    //    return BookMatch(that.matchParserId, asyncCbk);
-                    //}
-
-                    else
-                        return asyncCbk(null);
+                    else {
+                        if (process.env.ENABLE_FEEDS) {
+                            StartQueueReceiver(that.matchParserId);
+                            return BookMatch(that.matchParserId, asyncCbk);
+                        }
+                        else
+                            return asyncCbk(null);
+                    }
                 }
             ], cbk);
         }
@@ -596,12 +594,12 @@ Parser.prototype.init = function (cbk) {
                     log.info(`[Statscore on ${that.matchHandler.name}]: Scheduled queue listener started for matchid ${that.matchHandler.id}`);
                     if (that.isFeedReplay)
                         that.StartMatchFeedReplayer(that.feedService.simulatedfeed, that.sportimoEventIdsQueue);
-
-                    // !! Uncomment before PRODUCTION !!
-
-                    //else
-                    //    StartQueueReceiver(that.matchParserId);
-                                //MessagingTools.sendPushToAdmins({ en: 'Statscore scheduled feed listener started for matchid: ' + that.matchHandler.id });
+                    else {
+                        if (process.env.ENABLE_FEEDS) {
+                            StartQueueReceiver(that.matchParserId);
+                            MessagingTools.sendPushToAdmins({ en: 'Statscore scheduled feed listener started for matchid: ' + that.matchHandler.id });
+                        }
+                    }
                 });
 
                 if (that.scheduledTask) {
