@@ -274,14 +274,13 @@ api.UpdateLeagueStandings = function (req, res) {
     var leagueId = req.params.competitionId;
     
     var season = req.body.season;
-    res.status(200).send("Request received.");
     
     // UpdateTeams for each supported parser
     var response = { error: null, parsers: {} };
     var parser = req.query.parser || selectedUpdateParser;
 
     try {
-        parser.UpdateLeagueStandings(null, leagueId, season, null, function (error, teamsIncluded) {
+        parser.UpdateLeagueStandings(null, leagueId, season, function (error, teamsIncluded) {
             if (!error) {
                 response.parsers[parser.Name] = {
                     error: null,

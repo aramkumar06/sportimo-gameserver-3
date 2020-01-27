@@ -2044,7 +2044,7 @@ Parser.UpdateAllCompetitionStats = function (competitionId, season, outerCallbac
     async.waterfall(
         [
             function (callback) {
-                GetLeagueFromMongo(competitionId, null, false, function (error, comp) {
+                GetLeagueFromMongo(competitionId, season, false, function (error, comp) {
                     if (error)
                         return callback(error);
                     competitionSeason = comp;
@@ -2053,7 +2053,7 @@ Parser.UpdateAllCompetitionStats = function (competitionId, season, outerCallbac
             },
             function (callback) {
                 log.info('Now on to updating teams and players for competition %s', competitionSeason.competition.name.en);
-                Parser.UpdateTeams(competitionId, null, function (error, teamsAdded, playersAdded, teamsUpdated, playersUpdated) {
+                Parser.UpdateTeams(competitionId, competitionSeason.id, function (error, teamsAdded, playersAdded, teamsUpdated, playersUpdated) {
                     if (error)
                         return callback(error);
                     callback(null);
@@ -2103,10 +2103,10 @@ Parser.UpdateAllCompetitionStats = function (competitionId, season, outerCallbac
             }
         ], function (error) {
             if (error) {
-                log.error('Error while updating all stats for competition %s and season %d: %s', competitionId, season, error.message);
+                log.error(`Error while updating all stats for competition ${competitionId} and season ${season}: ${error.stack}`);
                 return outerCallback(error);
             }
-            log.info('Terminated updating teams and players statistics with success for competition %s', competitionSeason.name.en);
+            log.info('Terminated updating teams and players statistics with success for competition %s', !competitionSeason.name ? competitionSeason.id : competitionSeason.name.en);
 
             outerCallback(null);
         });
