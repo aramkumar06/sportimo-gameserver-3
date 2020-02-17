@@ -424,6 +424,104 @@ MessagingTools.sendSocketMessage = function (messageObject, callback) {
 };
 
 
+
+// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+// @@ 
+// @@   Feeder list and management
+
+if (PublishChannel)
+    PublishChannel.subscribe('feedEvents');
+
+const EventEmitter = require('events');
+MessagingTools.emitter = new EventEmitter();
+
+PublishChannel.on('feedEvents', (channel, data) => {
+    const dataObj = JSON.parse(data);
+
+    MessagingTools.emitter.emit(dataObj.name, dataObj.data);
+});
+
+
+MessagingTools.TryInsertMatchFeeders = function (match) {
+    if (!match || !match.moderation || match.moderation.length === 0)
+        return;
+
+    // Try to find the feeder in the list of live feeders
+    match.moderation.forEach(modFeeder => {
+        const length = PublishChannel.llen('feeders-live');
+        let feederFound = false;
+        let feeder = null;
+        for (var index = 0; index < length; index++) {
+            feeder = null;
+            try {
+                feeder = JSON.parse(PublishChannel.lindex('feeders-live', index));
+            }
+            catch (parseErr) {
+                console.error(`Error parsing redis feeders-live list: ${parseErr.stack}`);
+            }
+
+            if (feeder && feeder.match.id === match.id && feeder.feeder.parsername === modFeeder.parsername) {
+                feederFound = true;
+            }
+        }
+        if (!feederFound) {
+            const newFeederSpec = {
+                match: match,
+                feeder: modFeeder
+            };
+            const feederCommand = {
+                command: 'insert',
+                feeder: modFeeder,
+                match: match
+            };
+
+            // Push in the feeders-command queue, for consumers to being notified and race for grabbing it
+            PublishChannel.publish('feeders-commands', JSON.stringify(feederCommand));
+            // Push in the feeders-pending list, for consumers to start it
+            PublishChannel.rpush('feeders-pending', JSON.stringify(newFeederSpec));
+            //
+        }
+    });
+}
+
+MessagingTools.TryRemoveMatchFeeders = function (match) {
+    if (!match || !match.moderation || match.moderation.length === 0)
+        return;
+
+    // Try to find the feeder in the list of live feeders
+    _.forEach(match.moderation, modFeeder) {
+        const length = PublishChannel.llen('feeders-live');
+        let feederFound = null;
+        let feeder = null;
+        for (var index = 0; index < length; index++) {
+            feeder = null;
+            try {
+                feeder = JSON.parse(PublishChannel.lindex('feeders-live', index));
+            }
+            catch (parseErr) {
+                console.error(`Error parsing redis feeders-live list: ${parseErr.stack}`);
+            }
+
+            if (feeder && feeder.match.id === match.id && feeder.feeder.parsername === modFeeder.parsername) {
+                feederFound = feeder;
+            }
+        }
+        if (feederFound) {
+            const feederCommand = {
+                command: 'terminate',
+                feeder: feeder.feeder,
+                match: feeder.match
+            };
+            // Push in the feeders-command queue, for consumers to being notified and race for grabbing it
+            PublishChannel.publish('feeders-commands', JSON.stringify(feederCommand));
+            // Remove this item from the list
+            PublishChannel.lrem('feeders-live', 1, JSON.stringify(feederFound));
+        }
+    }
+}
+
+
+
 MessagingTools.SendTauntToUser = function (tauntData) {
     if (PublishChannel)
         PublishChannel.publish("socketServers", JSON.stringify({

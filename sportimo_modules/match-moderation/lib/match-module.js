@@ -31,6 +31,7 @@ const moment = require('moment'),
 const MessagingTools = require('../../messaging-tools');
 const PushNotifications = require('../../messaging-tools/PushNotifications');
 const Gamecards = require('../../gamecards');
+const feedConsumer = require('../services/feed-consumer');
 
 const path = require('path'),
     fs = require('fs');
@@ -213,137 +214,87 @@ var matchModule = function (match, shouldInitAutoFeed) {
         } else {
 
             HookedMatch.data.moderation.push(service);
-            HookedMatch.data.save();
 
-            HookedMatch.StartService(service, function (error, newService) {
+            HookedMatch.data.save(function (error, newService) {
                 if (error)
                     return callback(error);
 
+                HookedMatch.StartService(service);
                 callback(null, getServiceDTO(newService));
             });
 
         }
     };
 
-    HookedMatch.StartService = function (service, callback) {
+    HookedMatch.StartServices = function (service) {
         const that = this;
 
-        if (that.shouldInitAutoFeed == false) return callback(null);
+        if (that.shouldInitAutoFeed === false) return;
 
-        var foundService = _.find(that.services, { type: service.type });
-        if (foundService) {
-            foundService.Terminate(function () {
-                that.services = _.remove(that.services, function (aservice) {
-                    return (aservice.type === service.type);
-                });
-            });
-        }
+        MessagingTools.TryInsertMatchFeeders(HookedMatch.data);
 
-        var serviceType = serviceTypes[service.type];
-        if (!serviceType)
-            return callback(null);
+        const HandleEvent =  function (matchEvent) {
+            if (matchEvent && matchEvent.data.match_id === HookedMatch.data.id)
+                if (HookedMatch.queue)
+                    HookedMatch.queue.push(matchEvent);
+                else
+                    HookedMatch.AddEvent(matchEvent);
+        };
+        const HandleSegment = function (state) {
+            //if (matchEventId && matchEventId == HookedMatch.data.id)
+            var StateEvent = { data: {} };
+            StateEvent.data.type = 'AdvanceSegment';
+            StateEvent.data.time = HookedMatch.data.time;
+            if (state)
+                StateEvent.data.state = state;
 
-        var newService = new serviceType(service);
-        if (!newService)
-            return callback(null);
-        //_.merge(newService, service);
-
-        // init the service by passing this.data as a context reference for internal communication (sending events)
-
-        //var clonedMatch = {
-        //    _id: that.data._id,
-        //    id: that.data.id,
-        //    home_team: that.data.home_team,
-        //    away_team: that.data.away_team,
-        //    home_score: that.data.home_score,
-        //    away_score: that.data.away_score,
-        //    completed: that.data.completed,
-        //    start: that.data.start,
-        //    parserids: that.data.parserids,
-        //    competition: that.data.competition,
-        //    state: that.data.state
-        //};
-        newService.init(that.data, function (error, initService) {
-            if (error) {
-                return PushNotifications.MatchModuleStartupFailure(HookedMatch.data, error, () => {
-
-                    // Update match in memory of being disabled
-                    HookedMatch.data.disabled = true;
-
-                    //Terminate service
-                    if (newService) {
-                        try {
-                            newService.Terminate(() => {
-                                return callback(error);
-                            });
-                        }
-                        catch (err) {
-                            return callback(error);
-                        }
-                    }
-                    else
-                        return callback(error);
-                });
+            if (HookedMatch.queue) {
+                console.log(`[Match module ${HookedMatch.name}] --------- Advance Segment Queue: ${HookedMatch.queue.length()}`);
+                HookedMatch.queue.push(StateEvent);
             }
+            else
+                HookedMatch.AdvanceSegment(StateEvent);
+        };
+        const HandleEndOfMatch = function () {
+            // if (matchEvent && matchEvent.id == HookedMatch.data.id)
+            //     console.log(HookedMatch.queue.length());
 
-            // Register this match module to the events emitted by the new service, but first filter only those relative to its match id (I have to re-evaluate this filter, might be redundant). 
-            initService.emitter.on('matchEvent', function (matchEvent) {
-                if (matchEvent && matchEvent.data.match_id == HookedMatch.data.id)
-                    if (HookedMatch.queue)
-                        HookedMatch.queue.push(matchEvent);
-                    else
-                        HookedMatch.AddEvent(matchEvent);
-            });
+            var StateEvent = { data: {} };
+            StateEvent.data.type = 'TerminateMatch';
+            StateEvent.data.time = HookedMatch.data.time;
 
-            initService.emitter.on('nextMatchSegment', function (state) {
-                //if (matchEventId && matchEventId == HookedMatch.data.id)
-                var StateEvent = { data: {} };
-                StateEvent.data.type = 'AdvanceSegment';
-                StateEvent.data.time = HookedMatch.data.time;
-                if (state)
-                    StateEvent.data.state = state;
+            if (HookedMatch.queue) {
+                console.log(`[Match module ${HookedMatch.name}] --------- End Segment Queue: ${HookedMatch.queue.length()}`);
+                HookedMatch.queue.push(StateEvent);
+            }
+            else
+                HookedMatch.TerminateMatch();
+        };
+        const HandleStats = function (matchid, stats) {
+            log.info(`[Match module ${HookedMatch.name}] Emmiter requested to send Stats_changed`);
+            if (matchid == HookedMatch.data.id)
+                MessagingTools.sendSocketMessage({
+                    sockets: true,
+                    payload: {
+                        type: "Stats_changed",
+                        room: HookedMatch.data.id,
+                        data: stats
+                    }
+                });
+        };
 
-                if (HookedMatch.queue) {
-                    console.log(`[Match module ${HookedMatch.name}] --------- Advance Segment Queue: ${HookedMatch.queue.length()}`);
-                    HookedMatch.queue.push(StateEvent);
-                }
-                else
-                    HookedMatch.AdvanceSegment(StateEvent);
-            });
-
-            initService.emitter.on('endOfMatch', function () {
-                // if (matchEvent && matchEvent.id == HookedMatch.data.id)
-                //     console.log(HookedMatch.queue.length());
-
-                var StateEvent = { data: {} };
-                StateEvent.data.type = 'TerminateMatch';
-                StateEvent.data.time = HookedMatch.data.time;
-
-                if (HookedMatch.queue) {
-                    console.log(`[Match module ${HookedMatch.name}] --------- End Segment Queue: ${HookedMatch.queue.length()}`);
-                    HookedMatch.queue.push(StateEvent);
-                }
-                else
-                    HookedMatch.TerminateMatch();
-            });
+        // Try unregistering prior handlers first
+        MessagingTools.emitter.removeListener('matchEvent', HandleEvent);
+        MessagingTools.emitter.removeListener('nextMatchSegment', HandleSegment);
+        MessagingTools.emitter.removeListener('endOfMatch', HandleEndOfMatch);
+        MessagingTools.emitter.removeListener('emitStats', HandleStats);
 
 
-            initService.emitter.on('emitStats', function (matchid, stats) {
-                log.info(`[Match module ${HookedMatch.name}] Emmiter requested to send Stats_changed`);
-                if (matchid == HookedMatch.data.id)
-                    MessagingTools.sendSocketMessage({
-                        sockets: true,
-                        payload: {
-                            type: "Stats_changed",
-                            room: HookedMatch.data.id,
-                            data: stats
-                        }
-                    });
-            });
-
-            that.services.push(initService);
-            callback(null, initService);
-        });
+        // Register this match module to the events emitted by the feed consumer, but first filter only those relative to its match id. 
+        MessagingTools.emitter.on('matchEvent', HandleEvent);
+        MessagingTools.emitter.on('nextMatchSegment', HandleSegment);
+        MessagingTools.emitter.on('endOfMatch', HandleEndOfMatch);
+        MessagingTools.emitter.on('emitStats', HandleStats);
     };
 
 
@@ -439,14 +390,7 @@ var matchModule = function (match, shouldInitAutoFeed) {
     };
 
     // Set services for the first time
-    //HookedMatch.moderationServices = match.moderation;
-    match.moderation.forEach(function (service) {
-        HookedMatch.StartService(service, function (error) {
-            if (error) {
-                log.error(`[Match module ${HookedMatch.name}] Error initializing the service ${service.type ? service.type : "Unknown"}: ${error.message}`);
-            }
-        });
-    });
+    HookedMatch.StartServices();
 
 
     HookedMatch.removeSegment = function (data, cbk) {
