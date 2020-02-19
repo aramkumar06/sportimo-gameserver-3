@@ -437,6 +437,46 @@ MessagingTools.SendTauntToUser = function (tauntData) {
 }
 
 
+
+// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+// @@ 
+// @@   User activity event keeping
+
+const UserEvents = require('../models/trn_user_event');
+var userActivityCargo = async.cargo((events, cbk) => {
+
+    try {
+        return mongoose.models.trn_user_events.insertMany(events, cbk);
+    }
+    catch (mongoErr) {
+
+        // log error
+        console.error(mongoErr.stack);
+
+        return cbk(null);
+    }
+}, 10);
+
+
+MessagingTools.storeUserEvent = function (clientId, userId, eventName, eventObject) {
+
+    const userEvent = new mongoose.models.trn_user_events({
+        client: clientId,
+        user: userId,
+        eventName: eventName,
+        eventObject: eventObject,
+        eventTime: new Date()
+    });
+
+    userActivityCargo.push(userEvent, (err, insertResult) => {
+        if (err) {
+            // log error
+            console.error(`Error writting user activity event: ${err.stack}`);
+        }
+    });
+};
+
+
 MessagingTools.SendMessageToInbox = function (msgData, callback) {
 
     //First create the message and save the instance in database

@@ -27,6 +27,7 @@ var path = require('path'),
     log = require('winston'),
     _ = require('lodash'),
     bodyParser = require('body-parser'),
+    userEvents = require('../models/trn_user_event'),
     mongoose = require('mongoose');
 
 /* Module to handle user feedback */
@@ -788,6 +789,9 @@ gamecards.Tick = function () {
                                 if (gamecard.specials && gamecard.specials.DoubleTime && gamecard.specials.DoubleTime.status == 1)
                                     gamecard.specials.DoubleTime.status = 0;
 
+                                // Queue card lost user event
+                                userEvents.StoreUserEvent(gamecard.client, gamecard.userid, 'user-card-lost', gamecard);
+
                                 // Send an event through Redis pu/sub:
                                 // log.info("Card lost: " + gamecard);
                                 MessagingTools.sendSocketMessage({
@@ -1229,6 +1233,10 @@ gamecards.publishWinToUser = function (gamecard) {
     // Delay publication so to avoid missing the event on sockets
     // console.log("called to win:" + Date.now());
     setTimeout(function () {
+
+        // Queue card won user event
+        userEvents.StoreUserEvent(gamecard.client, gamecard.userid, 'user-card-won', gamecard);
+
         // console.log("publish:" + Date.now());
         MessagingTools.sendSocketMessage({
             sockets: true,
@@ -1325,6 +1333,9 @@ gamecards.GamecardsTerminationHandle = function (mongoGamecards, event, match, c
                     gamecard.specials.DoublePoints.status = 0;
                 if (gamecard.specials && gamecard.specials.DoubleTime && gamecard.specials.DoubleTime.status == 1)
                     gamecard.specials.DoubleTime.status = 0;
+
+                // Queue card lost user event
+                userEvents.StoreUserEvent(gamecard.client, gamecard.userid, 'user-card-lost', gamecard);
 
                 // Send an event through Redis pu/sub:
                 // log.info("Card lost: " + gamecard);
@@ -1692,6 +1703,10 @@ gamecards.ResolveEvent = function (matchEvent) {
             }
             else
                 if (gamecards.CheckIfLooses(gamecard, false)) {
+
+                    // Queue card lost user event
+                    userEvents.StoreUserEvent(gamecard.client, gamecard.userid, 'user-card-lost', gamecard);
+
                     // log.info("Card lost: " + gamecard);
                     MessagingTools.sendSocketMessage({
                         sockets: true,
@@ -2415,6 +2430,10 @@ gamecards.TerminateMatch = function (match, callback) {
                 gamecard.terminationTime = moment.utc().toDate();
                 gamecard.status = 2;
                 gamecard.pointsAwarded = 0;
+
+                // Queue card lost user event
+                userEvents.StoreUserEvent(gamecard.client, gamecard.userid, 'user-card-lost', gamecard);
+
                 // Send an event through Redis pu/sub:
                 // log.info("Card lost: " + gamecard);
                 MessagingTools.sendSocketMessage({

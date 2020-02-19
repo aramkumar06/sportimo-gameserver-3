@@ -6,6 +6,8 @@ const redis = require('redis');
 const mongoCreds = require('../config/mongoConfig');
 const async = require('async');
 const winston = require('winston');
+const { Client } = require('pg');
+const PostgresClient = Client;
 
 /*
  * 
@@ -20,11 +22,12 @@ import logger from 'winston';
 
 
 class GenericJob {
-    constructor(name, needsMongo, needsRedis, cb) {
+    constructor(name, needsMongo, needsRedis, needsPostgres) {
         this.startTime = new Date();
         this.name = name;
         this.needsMongo = !!needsMongo;
         this.needsRedis = !!needsRedis;
+        this.needsPostgres = !!needsPostgres;
 
         this.logger = new (winston.Logger)({
             levels: {
@@ -63,7 +66,8 @@ class GenericJob {
         mongoose.Promise = global.Promise;
 
         mongoose.connect(mongoConnectionString, {
-            useNewUrlParser: true
+            useNewUrlParser: true,
+            useFindAndModify: false
         }, function (err, res) {
             if (err) {
                 that.logger.error('ERROR connecting to: ' + mongoConnection + '. ' + err);
@@ -87,7 +91,39 @@ class GenericJob {
         this.redis.on('error', function (err) {
             this.logger.error('Redis error:', err);
         });
-        cb();
+        async.nextTick(cb);
+    }
+
+    connectToPostgres(cb) { // callback is optional
+            const that = this;
+
+            const client = that.postgres = new PostgresClient({
+                connectionString: process.env.DATABASE_URL || 'postgres://data_importer:tableau.c0cbdf19b42f@46.16.77.170:5432/postgres',
+                ssl: process.env.POSTGRES_SSL_ENABLED || false
+            });
+            client.on('error', (err) => {
+                that.logger.error(`Error in Postgres connection: ${err.stack}`);
+                this.postgres.end();
+            });
+            client.on('end', (err) => {
+                that.logger.info(`Postgres connection is closed. Reconnecting in 30 seconds ...`);
+                setTimeout(() => {
+                    that.connectPostgres(() => { });
+                }, 30000);
+            });
+            client.connect((err, connClient) => {
+                if (err) {
+                    that.logger.error(`Error in establishing Postgres connection: ${err.stack}`);
+                    return cb(err);
+                }
+
+                if (connClient) {
+                    that.postgres = connClient;
+                    that.logger.log("[Game Server] PostgreSQL Connected.");
+                }
+
+                return cb(null);
+            });
     }
 
 
@@ -97,7 +133,8 @@ class GenericJob {
 
         async.parallel([
             (cbk) => that.needsMongo ? that.connectToMongoDb(cbk) : async.nextTick(cbk),
-            (cbk) => that.needsRedis ? that.connectToRedis(cbk) : async.nextTick(cbk)
+            (cbk) => that.needsRedis ? that.connectToRedis(cbk) : async.nextTick(cbk),
+            (cbk) => that.needsPostgres ? that.connectToPostgres(cbk) : async.nextTick(cbk)
         ], cb);
     }
 
@@ -110,6 +147,8 @@ class GenericJob {
             this.redis.quit();
         if (this.needsMongo)
             this.mongo.disconnect();
+        if (this.needsPostgres)
+            this.postgres.end();
 
         this.logger.info(`${this.name} terminated in ${diff} seconds`);
         process.exit(0);
